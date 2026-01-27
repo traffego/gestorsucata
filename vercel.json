@@ -1,13 +1,13 @@
 {
-    "public": false,
+    "outputDirectory": "app/dist",
     "rewrites": [
         {
             "source": "/app/(.*)",
-            "destination": "/app/dist/$1"
+            "destination": "/$1"
         },
         {
             "source": "/app",
-            "destination": "/app/dist/index.html"
+            "destination": "/index.html"
         }
     ]
 }
