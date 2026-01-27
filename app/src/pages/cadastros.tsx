@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
-    Plus, Search, Filter, Mail, Phone, MapPin, MoreHorizontal,
-    Factory, Tag, Package, Users, Truck, UserCheck, ChevronRight
+    Plus, Search, MoreHorizontal,
+    Factory, Tag, Package, Users, Truck, UserCheck
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
