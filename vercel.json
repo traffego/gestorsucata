@@ -1,0 +1,13 @@
+{
+    "public": false,
+    "rewrites": [
+        {
+            "source": "/app/(.*)",
+            "destination": "/app/dist/$1"
+        },
+        {
+            "source": "/app",
+            "destination": "/app/dist/index.html"
+        }
+    ]
+}
