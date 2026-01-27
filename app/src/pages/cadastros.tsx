@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Plus, Search, Filter, Mail, Phone, MapPin, Building2, MoreHorizontal } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Plus, Search, Filter, Mail, Phone, MapPin, MoreHorizontal } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 

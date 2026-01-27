@@ -5,8 +5,6 @@ import {
     Bar,
     AreaChart,
     Area,
-    XAxis,
-    YAxis,
     CartesianGrid,
     Tooltip,
     ResponsiveContainer,
@@ -15,6 +13,7 @@ import {
     Cell
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 
 const fluxodeCaixaData = [
     { name: 'Jan', entrada: 2000, saida: 1500 },
@@ -45,7 +44,7 @@ const girodeEstoqueData = [
     { name: 'Lento', value: 30 },
 ];
 
-const COLORS = ['#E31E24', '#FFD700', '#2C2C2C', '#4B4B4B', '#6D6D6D'];
+
 
 export default function Dashboard() {
     return (

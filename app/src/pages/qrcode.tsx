@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { QrCode as QrIcon, Download, Copy, RefreshCw, Smartphone, Package, Tag, User } from "lucide-react";
+import { Download, Copy, RefreshCw, Smartphone, Package, Tag, User } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { QRCodeSVG } from 'qrcode.react';
+import { cn } from "@/lib/utils";
 
 export default function QRCodeModule() {
     const [qrValue, setQrValue] = useState("GSPRO-665231");
@@ -121,6 +122,4 @@ export default function QRCodeModule() {
     );
 }
 
-function cn(...inputs: any[]) {
-    return inputs.filter(Boolean).join(' ');
-}
+

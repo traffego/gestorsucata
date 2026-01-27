@@ -1,4 +1,5 @@
-import { ArrowUpRight, ArrowDownRight, DollarSign, Wallet, CreditCard, Banknote, Calendar } from "lucide-react";
+import { ArrowUpRight, ArrowDownRight, DollarSign, Wallet, Calendar } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
