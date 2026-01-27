@@ -52,12 +52,13 @@ export function Sidebar({ className }: SidebarProps) {
         <div className={cn("pb-12 h-screen border-r bg-brand-dark overflow-y-auto", className)}>
             <div className="space-y-4 py-4">
                 <div className="px-6 py-2 flex items-center gap-2">
-                    <div className="flex flex-col">
-                        <span className="text-2xl font-bold tracking-tight text-white">
-                            <span className="text-brand-red">GS</span>{" "}
-                            <span className="text-brand-yellow">PRO</span>
-                        </span>
-                        <span className="text-[10px] text-gray-400 font-medium uppercase tracking-widest">
+                    <div className="flex flex-col items-center">
+                        <img
+                            src="/gs-logo.png"
+                            alt="GS PRO"
+                            className="h-32 w-auto mb-2 drop-shadow-2xl hover:scale-105 transition-transform duration-300"
+                        />
+                        <span className="text-[10px] text-gray-400 font-medium uppercase tracking-widest text-center">
                             Quem não controla, quebra.
                         </span>
                     </div>
