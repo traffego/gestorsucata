@@ -13,13 +13,7 @@ import {
     UserCheck,
     Factory,
     MapPin,
-    TrendingDown,
-    TrendingUp,
-    Wallet,
-    Gamepad2,
-    FileEdit,
-    History,
-    HelpCircle
+    History
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
