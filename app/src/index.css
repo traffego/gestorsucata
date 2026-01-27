@@ -61,7 +61,7 @@
     @apply bg-background text-foreground;
   }
 
-  /* Remove pointer cursor from all clickable elements */
+  /* Ensure pointer cursor on all clickable elements */
   button,
   a,
   [role="button"],
@@ -71,6 +71,6 @@
   input[type="checkbox"],
   input[type="radio"],
   select {
-    cursor: default !important;
+    cursor: pointer !important;
   }
 }
