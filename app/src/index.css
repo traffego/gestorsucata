@@ -60,4 +60,17 @@
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Remove pointer cursor from all clickable elements */
+  button,
+  a,
+  [role="button"],
+  [type="button"],
+  [type="submit"],
+  [type="reset"],
+  input[type="checkbox"],
+  input[type="radio"],
+  select {
+    cursor: default !important;
+  }
 }
