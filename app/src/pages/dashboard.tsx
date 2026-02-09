@@ -19,15 +19,12 @@ import { supabase } from '@/lib/supabase';
 import { Loader2 } from 'lucide-react';
 
 export default function Dashboard() {
-    const [loading, setLoading] = useState(true);
     const [recentSales, setRecentSales] = useState<any[]>([]);
     const [fluxoCaixa, setFluxoCaixa] = useState<any[]>([]);
     const [despesasPorCategoria, setDespesasPorCategoria] = useState<any[]>([]);
     const [lucroMensal, setLucroMensal] = useState<any[]>([]);
-    const girodeEstoqueData = [
-        { name: 'Rápido', value: 70 },
-        { name: 'Lento', value: 30 },
-    ];
+    const [girodeEstoqueData, setGirodeEstoqueData] = useState<any[]>([]);
+    const [performanceVendedor, setPerformanceVendedor] = useState<any[]>([]);
 
     useEffect(() => {
         fetchDashboardData();
@@ -36,7 +33,7 @@ export default function Dashboard() {
     async function fetchDashboardData() {
         setLoading(true);
         try {
-            // 1. Fetch Recent Sales
+            // 1. Fetch Recent Sales with nested user data
             const { data: vendas } = await supabase
                 .from('vendas')
                 .select(`
@@ -54,24 +51,67 @@ export default function Dashboard() {
                 setRecentSales(vendas.map((v: any) => {
                     const vendedorNome = Array.isArray(v.vendedor) ? v.vendedor[0]?.nome : v.vendedor?.nome;
                     return {
-                        loja: 'Loja Principal',
-                        vendedor: vendedorNome || 'Vendedor',
+                        loja: 'Principal',
+                        vendedor: vendedorNome || 'Sistema',
                         data: new Date(v.data_venda).toLocaleString('pt-BR'),
                         cotacao: (v.valor_total || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
                     };
                 }));
             }
 
-            // 2. Fetch Financial Data (Current Year)
+            // 2. Fetch Performance by Seller (last 30 days)
+            const thirtyDaysAgo = new Date();
+            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+            const { data: sellerSales } = await supabase
+                .from('vendas')
+                .select('valor_total, usuario_id, usuarios(nome)')
+                .gte('data_venda', thirtyDaysAgo.toISOString());
+
+            if (sellerSales) {
+                const salesBySeller: Record<string, { total: number, name: string }> = {};
+                let maxTotal = 0;
+
+                sellerSales.forEach((s: any) => {
+                    const name = s.usuarios?.nome || 'Outros';
+                    const id = s.usuario_id || 'unknown';
+                    if (!salesBySeller[id]) salesBySeller[id] = { total: 0, name };
+                    salesBySeller[id].total += Number(s.valor_total || 0);
+                    if (salesBySeller[id].total > maxTotal) maxTotal = salesBySeller[id].total;
+                });
+
+                const performance = Object.entries(salesBySeller).map(([_, data]) => ({
+                    name: data.name,
+                    value: maxTotal > 0 ? Math.round((data.total / maxTotal) * 100) : 0,
+                    color: Math.random() > 0.5 ? 'bg-brand-red' : 'bg-brand-yellow'
+                })).sort((a, b) => b.value - a.value).slice(0, 4);
+
+                setPerformanceVendedor(performance);
+            }
+
+            // 3. Fetch Stock Stats (Giro de Estoque)
+            const { data: products } = await supabase
+                .from('produtos')
+                .select('estoque_atual, estoque_minimo, preco_venda');
+
+            if (products) {
+                const emAlerta = products.filter(p => (p.estoque_atual || 0) <= (p.estoque_minimo || 0)).length;
+                const ok = products.length - emAlerta;
+
+                setGirodeEstoqueData([
+                    { name: 'Em Estoque', value: ok },
+                    { name: 'Reposição', value: emAlerta },
+                ]);
+            }
+
+            // 4. Fetch Financial Data (Current Year)
             const currentYearStart = new Date(new Date().getFullYear(), 0, 1).toISOString();
 
-            // Entradas (Vendas)
             const { data: allSales } = await supabase
                 .from('vendas')
                 .select('data_venda, valor_total')
                 .gte('data_venda', currentYearStart);
 
-            // Saídas (Transações)
             const { data: allExpenses } = await supabase
                 .from('transacoes')
                 .select('data_transacao, valor, categoria, tipo')
@@ -98,8 +138,6 @@ export default function Dashboard() {
                         expensesByMonth[month] = (expensesByMonth[month] || 0) + Number(t.valor || 0);
                         expensesByCategory[t.categoria || 'Outros'] = (expensesByCategory[t.categoria || 'Outros'] || 0) + Number(t.valor || 0);
                     } else if (t.tipo === 'entrada') {
-                        // Se houver entradas avulsas nas transações, somamos aqui também? 
-                        // Por simplicidade no gráfico de fluxo de caixa, vamos manter Entrada = Vendas.
                         salesByMonth[month] = (salesByMonth[month] || 0) + Number(t.valor || 0);
                     }
                 });
@@ -112,7 +150,6 @@ export default function Dashboard() {
             }));
 
             setFluxoCaixa(chartData.slice(0, currentMonthIndex + 1));
-
             setLucroMensal(chartData.slice(0, currentMonthIndex + 1).map(d => ({
                 name: d.name,
                 value: d.entrada - d.saida
@@ -123,9 +160,7 @@ export default function Dashboard() {
                 .sort((a, b) => b.value - a.value)
                 .slice(0, 5);
 
-            setDespesasPorCategoria(categoryData.length > 0 ? categoryData : [
-                { name: 'Sem dados', value: 0 }
-            ]);
+            setDespesasPorCategoria(categoryData.length > 0 ? categoryData : [{ name: 'Sem dados', value: 0 }]);
 
         } catch (error) {
             console.error('Error fetching dashboard data:', error);
@@ -208,7 +243,7 @@ export default function Dashboard() {
 
                 <Card className="bg-brand-dark border-gray-800 text-white col-span-1">
                     <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium text-gray-400">Giro de Estoque (Rápido/Lento)</CardTitle>
+                        <CardTitle className="text-sm font-medium text-gray-400">Distribuição de Estoque</CardTitle>
                     </CardHeader>
                     <CardContent className="flex items-center justify-center">
                         <div className="h-[200px] w-full">
@@ -228,7 +263,9 @@ export default function Dashboard() {
                                         <Cell fill="#FFFFFF" />
                                         <Cell fill="#E31E24" />
                                     </Pie>
-                                    <Tooltip />
+                                    <Tooltip
+                                        contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333', color: '#fff' }}
+                                    />
                                 </PieChart>
                             </ResponsiveContainer>
                         </div>
@@ -277,27 +314,22 @@ export default function Dashboard() {
 
                 <Card className="bg-brand-dark border-gray-800 text-white lg:col-span-1">
                     <CardHeader>
-                        <CardTitle className="text-lg font-semibold">Desempenho por Vendedor/Loja</CardTitle>
+                        <CardTitle className="text-lg font-semibold">Top Vendedores (30 dias)</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-6">
                             <div className="flex items-center gap-2 text-xs text-gray-400">
                                 <div className="flex items-center gap-1">
                                     <div className="h-3 w-3 bg-brand-red rounded-sm"></div>
-                                    <span>Vendedor</span>
+                                    <span>Volume</span>
                                 </div>
                                 <div className="flex items-center gap-1">
                                     <div className="h-3 w-3 bg-brand-yellow rounded-sm"></div>
-                                    <span>Lucro</span>
+                                    <span>Relativo</span>
                                 </div>
                             </div>
 
-                            {[
-                                { name: 'Admin', value: 90, color: 'bg-brand-red' },
-                                { name: 'Loja 01', value: 75, color: 'bg-brand-yellow' },
-                                { name: 'Loja 02', value: 60, color: 'bg-brand-red' },
-                                { name: 'Vendedor X', value: 45, color: 'bg-brand-yellow' },
-                            ].map((item, i) => (
+                            {performanceVendedor.map((item, i) => (
                                 <div key={i} className="space-y-2">
                                     <div className="flex justify-between text-xs">
                                         <span>{item.name}</span>
@@ -308,6 +340,10 @@ export default function Dashboard() {
                                     </div>
                                 </div>
                             ))}
+
+                            {performanceVendedor.length === 0 && (
+                                <p className="text-center text-gray-500 py-8 italic text-sm">Sem dados de venda no período.</p>
+                            )}
                         </div>
                     </CardContent>
                 </Card>

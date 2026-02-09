@@ -1,51 +1,134 @@
-import { ArrowUpRight, ArrowDownRight, DollarSign, Wallet, Calendar } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ArrowUpRight, ArrowDownRight, DollarSign, Wallet, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/lib/supabase";
 
 export default function Financeiro() {
-    const transacoes = [
-        { id: 1, desc: 'Venda de Sucata Cobre', valor: 4200.00, tipo: 'entrada', data: '27/01/2026', forma: 'PIX' },
-        { id: 2, desc: 'Pagamento Aluguel Depósito', valor: -1800.00, tipo: 'saida', data: '25/01/2026', forma: 'Boleto' },
-        { id: 3, desc: 'Compra de Lote Baterias', valor: -3500.00, tipo: 'saida', data: '24/01/2026', forma: 'Transferência' },
-        { id: 4, desc: 'Venda de Motor Elétrico', valor: 250.00, tipo: 'entrada', data: '24/01/2026', forma: 'Dinheiro' },
-        { id: 5, desc: 'Pagamento Energia Elétrica', valor: -450.00, tipo: 'saida', data: '23/01/2026', forma: 'PIX' },
-    ];
+    const [loading, setLoading] = useState(true);
+    const [transacoes, setTransacoes] = useState<any[]>([]);
+    const [resumo, setResumo] = useState({
+        saldo: 0,
+        entradas: 0,
+        saidas: 0,
+        lucro: 0
+    });
+
+    useEffect(() => {
+        fetchFinanceiro();
+    }, []);
+
+    async function fetchFinanceiro() {
+        setLoading(true);
+        try {
+            // 1. Fetch Transações (Saídas e Entradas extras)
+            const { data: trans } = await supabase
+                .from('transacoes')
+                .select('*')
+                .order('data_transacao', { ascending: false });
+
+            // 2. Fetch Vendas (Entradas principais)
+            const { data: vendas } = await supabase
+                .from('vendas')
+                .select('valor_total, data_venda, forma_pagamento');
+
+            let totalEntradas = 0;
+            let totalSaidas = 0;
+
+            const mappedTrans = (trans || []).map(t => {
+                const valor = Number(t.valor || 0);
+                if (t.tipo === 'entrada') totalEntradas += valor;
+                else totalSaidas += valor;
+
+                return {
+                    id: t.id,
+                    desc: t.descricao || t.categoria || 'Transação',
+                    valor: t.tipo === 'entrada' ? valor : -valor,
+                    tipo: t.tipo,
+                    data: new Date(t.data_transacao).toLocaleDateString('pt-BR'),
+                    forma: t.forma_pagamento || 'N/A'
+                };
+            });
+
+            const mappedVendas = (vendas || []).map((v, i) => {
+                const valor = Number(v.valor_total || 0);
+                totalEntradas += valor;
+                return {
+                    id: `v-${i}`,
+                    desc: 'Venda de Produtos',
+                    valor: valor,
+                    tipo: 'entrada',
+                    data: new Date(v.data_venda).toLocaleDateString('pt-BR'),
+                    forma: v.forma_pagamento || 'N/A'
+                };
+            });
+
+            const allTrans = [...mappedVendas, ...mappedTrans]
+                .sort((a, b) => {
+                    const dateA = a.data.split('/').reverse().join('-');
+                    const dateB = b.data.split('/').reverse().join('-');
+                    return dateB.localeCompare(dateA);
+                })
+                .slice(0, 10);
+
+            setTransacoes(allTrans);
+            setResumo({
+                saldo: totalEntradas - totalSaidas,
+                entradas: totalEntradas,
+                saidas: totalSaidas,
+                lucro: totalEntradas - totalSaidas
+            });
+
+        } catch (error) {
+            console.error('Erro ao buscar dados financeiros:', error);
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    if (loading) {
+        return (
+            <div className="flex h-screen items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-brand-yellow" />
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-8">
             <div>
-                <h2 className="text-3xl font-bold tracking-tight text-white mb-2">FINANCEIRO</h2>
-                <p className="text-gray-400 italic">Controle total sobre o fluxo de caixa e lucros da GS PRO.</p>
+                <h2 className="text-3xl font-bold tracking-tight text-white mb-2 italic uppercase">FINANCEIRO</h2>
+                <p className="text-gray-400 italic">Controle total sobre o fluxo de caixa baseado em dados reais.</p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <Card className="bg-brand-dark border-gray-800 text-white">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-xs font-semibold uppercase tracking-wider text-gray-500">Saldo Total</CardTitle>
+                        <CardTitle className="text-xs font-semibold uppercase tracking-wider text-gray-500">Saldo Atualizado</CardTitle>
                         <Wallet className="h-4 w-4 text-brand-yellow" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">R$ 45.230,00</div>
-                        <div className="text-[10px] text-gray-500 mt-1">Conta Principal</div>
+                        <div className="text-2xl font-bold">{resumo.saldo.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
+                        <div className="text-[10px] text-gray-500 mt-1 italic">Consolidado Vendas + Transações</div>
                     </CardContent>
                 </Card>
                 <Card className="bg-brand-dark border-gray-800 text-white border-l-4 border-l-green-500">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-xs font-semibold uppercase tracking-wider text-gray-500">Entradas (Mês)</CardTitle>
+                        <CardTitle className="text-xs font-semibold uppercase tracking-wider text-gray-500">Total Entradas</CardTitle>
                         <ArrowUpRight className="h-4 w-4 text-green-500" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-green-500">+ R$ 12.890</div>
+                        <div className="text-2xl font-bold text-green-500">+ {resumo.entradas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
                     </CardContent>
                 </Card>
                 <Card className="bg-brand-dark border-gray-800 text-white border-l-4 border-l-brand-red">
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-xs font-semibold uppercase tracking-wider text-gray-500">Saídas (Mês)</CardTitle>
+                        <CardTitle className="text-xs font-semibold uppercase tracking-wider text-gray-500">Total Saídas</CardTitle>
                         <ArrowDownRight className="h-4 w-4 text-brand-red" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-brand-red">- R$ 5.420</div>
+                        <div className="text-2xl font-bold text-brand-red">- {resumo.saidas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
                     </CardContent>
                 </Card>
                 <Card className="bg-brand-dark border-brand-yellow/30 text-white overflow-hidden relative">
@@ -53,11 +136,11 @@ export default function Financeiro() {
                         <DollarSign className="h-24 w-24 text-brand-yellow" />
                     </div>
                     <CardHeader className="flex flex-row items-center justify-between pb-2">
-                        <CardTitle className="text-xs font-semibold uppercase tracking-wider text-gray-500">Lucro Estimado</CardTitle>
+                        <CardTitle className="text-xs font-semibold uppercase tracking-wider text-gray-500">Lucro Líquido</CardTitle>
                         <span className="h-2 w-2 rounded-full bg-brand-yellow animate-pulse"></span>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold text-brand-yellow">R$ 7.470,00</div>
+                        <div className="text-2xl font-bold text-brand-yellow">{resumo.lucro.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</div>
                     </CardContent>
                 </Card>
             </div>
@@ -65,16 +148,18 @@ export default function Financeiro() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <Card className="bg-brand-dark border-gray-800 text-white lg:col-span-2">
                     <CardHeader className="flex flex-row items-center justify-between border-b border-gray-800 mb-4">
-                        <CardTitle className="text-lg">Últimas Transações</CardTitle>
-                        <Button variant="ghost" size="sm" className="text-xs text-gray-500 hover:text-white">Ver tudo</Button>
+                        <CardTitle className="text-lg">Fluxo de Caixa Recente</CardTitle>
+                        <Button variant="ghost" size="sm" className="text-xs text-gray-500 hover:text-white">Explorar Histórico</Button>
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-4">
-                            {transacoes.map((item) => (
-                                <div key={item.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-white/5 transition-colors">
+                            {transacoes.length === 0 ? (
+                                <p className="text-center text-gray-500 py-12 italic">Nenhuma transação registrada no banco de dados.</p>
+                            ) : transacoes.map((item) => (
+                                <div key={item.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-white/5 transition-colors group">
                                     <div className="flex items-center gap-4">
                                         <div className={cn(
-                                            "h-10 w-10 rounded-full flex items-center justify-center",
+                                            "h-10 w-10 rounded-full flex items-center justify-center transition-transform group-hover:scale-110",
                                             item.tipo === 'entrada' ? 'bg-green-500/10 text-green-500' : 'bg-brand-red/10 text-brand-red'
                                         )}>
                                             {item.tipo === 'entrada' ? <ArrowUpRight className="h-5 w-5" /> : <ArrowDownRight className="h-5 w-5" />}
@@ -84,8 +169,8 @@ export default function Financeiro() {
                                             <p className="text-[10px] text-gray-500 font-mono tracking-tighter">{item.data} • {item.forma}</p>
                                         </div>
                                     </div>
-                                    <div className={cn("text-sm font-bold", item.tipo === 'entrada' ? 'text-green-500' : 'text-brand-red')}>
-                                        {item.tipo === 'entrada' ? '+' : '-'} R$ {Math.abs(item.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                    <div className={cn("text-sm font-bold font-mono", item.tipo === 'entrada' ? 'text-green-500' : 'text-brand-red')}>
+                                        {item.tipo === 'entrada' ? '+' : '-'} {Math.abs(item.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                                     </div>
                                 </div>
                             ))}
@@ -95,36 +180,27 @@ export default function Financeiro() {
 
                 <Card className="bg-brand-dark border-gray-800 text-white lg:col-span-1">
                     <CardHeader>
-                        <CardTitle className="text-lg">Contas a Vencer</CardTitle>
+                        <CardTitle className="text-lg">Status Financeiro</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="space-y-4">
-                            {[
-                                { desc: 'Internet Fibra', valor: 150.00, data: '30/01', status: 'pendente' },
-                                { desc: 'Fornecedor Cobre', valor: 1200.00, data: '02/02', status: 'pendente' },
-                                { desc: 'Manutenção Balança', valor: 450.00, data: '05/02', status: 'urgente' },
-                            ].map((conta, i) => (
-                                <div key={i} className="flex flex-col gap-2 p-3 border border-gray-800 rounded-lg">
-                                    <div className="flex justify-between items-start">
-                                        <span className="text-sm font-medium">{conta.desc}</span>
-                                        <span className={cn(
-                                            "text-[10px] px-1.5 py-0.5 rounded font-bold uppercase",
-                                            conta.status === 'urgente' ? 'bg-brand-red text-white' : 'bg-gray-800 text-gray-400'
-                                        )}>
-                                            {conta.status}
-                                        </span>
-                                    </div>
-                                    <div className="flex justify-between items-center text-xs">
-                                        <span className="text-gray-500 flex items-center gap-1">
-                                            <Calendar className="h-3 w-3" /> Vence em {conta.data}
-                                        </span>
-                                        <span className="font-bold text-white">R$ {conta.valor.toFixed(2)}</span>
-                                    </div>
+                        <div className="space-y-6">
+                            <div className="p-4 bg-brand-darker border border-gray-800 rounded-xl">
+                                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-1">Saúde do Caixa</p>
+                                <div className="text-lg font-bold text-white">
+                                    {resumo.saldo > 0 ? 'Positivo' : 'Alerta'}
                                 </div>
-                            ))}
-                            <Button className="w-full mt-4 bg-brand-yellow text-brand-dark font-bold hover:bg-brand-yellow/80">
-                                Pagar Contas
+                                <div className="w-full h-1.5 bg-gray-800 rounded-full mt-2 overflow-hidden">
+                                    <div
+                                        className={cn("h-full rounded-full transition-all duration-1000", resumo.saldo > 0 ? "bg-green-500" : "bg-brand-red")}
+                                        style={{ width: `${Math.min(100, (resumo.entradas / (resumo.saidas || 1)) * 10)}%` }}
+                                    ></div>
+                                </div>
+                            </div>
+
+                            <Button className="w-full h-12 bg-brand-yellow text-brand-dark font-black hover:bg-brand-yellow/80 uppercase tracking-tighter italic">
+                                Gerar Relatório PDF
                             </Button>
+                            <p className="text-[10px] text-gray-600 text-center italic">Relatórios consolidados pelo GS PRO System.</p>
                         </div>
                     </CardContent>
                 </Card>
