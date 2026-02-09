@@ -97,32 +97,61 @@ export default function Vendas() {
     const handleDeleteSale = async (e: React.MouseEvent, saleId: string) => {
         e.stopPropagation(); // Impede expandir o card ao clicar no delete
 
-        if (!confirm("Tem certeza que deseja excluir esta venda? Esta ação não pode ser desfeita e o estoque não será devolvido automaticamente.")) {
+        if (!confirm("Tem certeza que deseja excluir esta venda? O estoque dos itens será devolvido automaticamente.")) {
             return;
         }
 
         setLoading(true);
         try {
-            // 1. Excluir itens da venda primeiro (se não houver cascade delete no banco)
-            const { error: itensError } = await supabase
+            // 1. Buscar itens da venda para devolver ao estoque
+            const { data: itensVenda, error: itensFetchError } = await supabase
+                .from('itens_venda')
+                .select('produto_id, quantidade')
+                .eq('venda_id', saleId);
+
+            if (itensFetchError) throw itensFetchError;
+
+            // 2. Devolver estoque de cada item
+            if (itensVenda && itensVenda.length > 0) {
+                // Para cada item, buscamos o estoque atual e somamos
+                // O ideal seria uma RPC (função no banco), mas faremos via código por enquanto
+                for (const item of itensVenda) {
+                    const { data: produto, error: prodError } = await supabase
+                        .from('produtos')
+                        .select('estoque_atual')
+                        .eq('id', item.produto_id)
+                        .single();
+
+                    if (!prodError && produto) {
+                        const novoEstoque = (produto.estoque_atual || 0) + item.quantidade;
+                        await supabase
+                            .from('produtos')
+                            .update({ estoque_atual: novoEstoque })
+                            .eq('id', item.produto_id);
+                    }
+                }
+            }
+
+            // 3. Excluir itens da venda 
+            const { error: itensDeleteError } = await supabase
                 .from('itens_venda')
                 .delete()
                 .eq('venda_id', saleId);
 
-            if (itensError) throw itensError;
+            if (itensDeleteError) throw itensDeleteError;
 
-            // 2. Excluir a venda
-            const { error: vendaError } = await supabase
+            // 4. Excluir a venda
+            const { error: vendaDeleteError } = await supabase
                 .from('vendas')
                 .delete()
                 .eq('id', saleId);
 
-            if (vendaError) throw vendaError;
+            if (vendaDeleteError) throw vendaDeleteError;
 
-            // 3. Atualizar estado local
+            // 5. Atualizar estado local
             setSales(prev => prev.filter(s => s.id !== saleId));
 
-            // Opcional: Mostrar toast de sucesso
+            alert('Venda excluída e estoque devolvido com sucesso!');
 
         } catch (error: any) {
             console.error('Erro ao excluir venda:', error);
