@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import {
     LineChart,
     Line,
@@ -14,39 +15,133 @@ import {
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-
-const fluxodeCaixaData = [
-    { name: 'Jan', entrada: 2000, saida: 1500 },
-    { name: 'Fev', entrada: 3500, saida: 2200 },
-    { name: 'Mar', entrada: 2800, saida: 3200 },
-    { name: 'Abr', entrada: 2400, saida: 1800 },
-    { name: 'Mai', entrada: 3800, saida: 2500 },
-    { name: 'Jun', entrada: 3200, saida: 1800 },
-];
-
-const despesasData = [
-    { name: 'Aluguel', value: 1800 },
-    { name: 'Salários', value: 1400 },
-    { name: 'Energia', value: 1100 },
-    { name: 'Manut.', value: 900 },
-    { name: 'Outros', value: 600 },
-];
-
-const lucroData = [
-    { name: 'Trim 1', value: 150 },
-    { name: 'Fev/22', value: 280 },
-    { name: 'Trim B', value: 220 },
-    { name: 'Abril', value: 450 },
-];
-
-const girodeEstoqueData = [
-    { name: 'Rápido', value: 70 },
-    { name: 'Lento', value: 30 },
-];
-
-
+import { supabase } from '@/lib/supabase';
+import { Loader2 } from 'lucide-react';
 
 export default function Dashboard() {
+    const [loading, setLoading] = useState(true);
+    const [recentSales, setRecentSales] = useState<any[]>([]);
+    const [fluxoCaixa, setFluxoCaixa] = useState<any[]>([]);
+    const [despesasPorCategoria, setDespesasPorCategoria] = useState<any[]>([]);
+    const [lucroMensal, setLucroMensal] = useState<any[]>([]);
+    const girodeEstoqueData = [
+        { name: 'Rápido', value: 70 },
+        { name: 'Lento', value: 30 },
+    ];
+
+    useEffect(() => {
+        fetchDashboardData();
+    }, []);
+
+    async function fetchDashboardData() {
+        setLoading(true);
+        try {
+            // 1. Fetch Recent Sales
+            const { data: vendas } = await supabase
+                .from('vendas')
+                .select(`
+                    id,
+                    valor_total,
+                    data_venda,
+                    forma_pagamento,
+                    cliente:clientes(nome),
+                    vendedor:usuarios(nome) 
+                `)
+                .order('data_venda', { ascending: false })
+                .limit(5);
+
+            if (vendas) {
+                setRecentSales(vendas.map((v: any) => {
+                    const vendedorNome = Array.isArray(v.vendedor) ? v.vendedor[0]?.nome : v.vendedor?.nome;
+                    return {
+                        loja: 'Loja Principal',
+                        vendedor: vendedorNome || 'Vendedor',
+                        data: new Date(v.data_venda).toLocaleString('pt-BR'),
+                        cotacao: (v.valor_total || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                    };
+                }));
+            }
+
+            // 2. Fetch Financial Data (Current Year)
+            const currentYearStart = new Date(new Date().getFullYear(), 0, 1).toISOString();
+
+            // Entradas (Vendas)
+            const { data: allSales } = await supabase
+                .from('vendas')
+                .select('data_venda, valor_total')
+                .gte('data_venda', currentYearStart);
+
+            // Saídas (Transações)
+            const { data: allExpenses } = await supabase
+                .from('transacoes')
+                .select('data_transacao, valor, categoria, tipo')
+                .gte('data_transacao', currentYearStart);
+
+            const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+            const currentMonthIndex = new Date().getMonth();
+
+            const salesByMonth: Record<string, number> = {};
+            const expensesByMonth: Record<string, number> = {};
+            const expensesByCategory: Record<string, number> = {};
+
+            if (allSales) {
+                allSales.forEach(v => {
+                    const month = new Date(v.data_venda).getMonth();
+                    salesByMonth[month] = (salesByMonth[month] || 0) + Number(v.valor_total || 0);
+                });
+            }
+
+            if (allExpenses) {
+                allExpenses.forEach(t => {
+                    const month = new Date(t.data_transacao).getMonth();
+                    if (t.tipo === 'saida') {
+                        expensesByMonth[month] = (expensesByMonth[month] || 0) + Number(t.valor || 0);
+                        expensesByCategory[t.categoria || 'Outros'] = (expensesByCategory[t.categoria || 'Outros'] || 0) + Number(t.valor || 0);
+                    } else if (t.tipo === 'entrada') {
+                        // Se houver entradas avulsas nas transações, somamos aqui também? 
+                        // Por simplicidade no gráfico de fluxo de caixa, vamos manter Entrada = Vendas.
+                        salesByMonth[month] = (salesByMonth[month] || 0) + Number(t.valor || 0);
+                    }
+                });
+            }
+
+            const chartData = months.map((m, index) => ({
+                name: m,
+                entrada: salesByMonth[index] || 0,
+                saida: expensesByMonth[index] || 0
+            }));
+
+            setFluxoCaixa(chartData.slice(0, currentMonthIndex + 1));
+
+            setLucroMensal(chartData.slice(0, currentMonthIndex + 1).map(d => ({
+                name: d.name,
+                value: d.entrada - d.saida
+            })));
+
+            const categoryData = Object.entries(expensesByCategory)
+                .map(([name, value]) => ({ name, value }))
+                .sort((a, b) => b.value - a.value)
+                .slice(0, 5);
+
+            setDespesasPorCategoria(categoryData.length > 0 ? categoryData : [
+                { name: 'Sem dados', value: 0 }
+            ]);
+
+        } catch (error) {
+            console.error('Error fetching dashboard data:', error);
+        } finally {
+            setLoading(false);
+        }
+    }
+
+    if (loading) {
+        return (
+            <div className="flex h-screen items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-brand-yellow" />
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-8">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -57,20 +152,22 @@ export default function Dashboard() {
                     <CardContent>
                         <div className="h-[200px] w-full mt-4">
                             <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={fluxodeCaixaData}>
+                                <LineChart data={fluxoCaixa}>
                                     <CartesianGrid strokeDasharray="3 3" stroke="#2c2c2c" vertical={false} />
                                     <Tooltip
                                         contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333', color: '#fff' }}
                                         itemStyle={{ color: '#fff' }}
+                                        formatter={(value: any) => Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                                     />
-                                    <Line type="monotone" dataKey="entrada" stroke="#4ade80" strokeWidth={2} dot={false} />
-                                    <Line type="monotone" dataKey="saida" stroke="#f43f5e" strokeWidth={2} dot={false} />
+                                    <Line type="monotone" dataKey="entrada" stroke="#4ade80" strokeWidth={2} dot={false} name="Entradas" />
+                                    <Line type="monotone" dataKey="saida" stroke="#f43f5e" strokeWidth={2} dot={false} name="Saídas" />
                                 </LineChart>
                             </ResponsiveContainer>
                         </div>
                     </CardContent>
                 </Card>
 
+                {/* Keeping other chards static/mocked for now as requested focus was on general 'database reality' */}
                 <Card className="bg-brand-dark border-gray-800 text-white col-span-1">
                     <CardHeader className="pb-2">
                         <CardTitle className="text-sm font-medium text-gray-400">Despesas (Categorias)</CardTitle>
@@ -78,9 +175,10 @@ export default function Dashboard() {
                     <CardContent>
                         <div className="h-[200px] w-full mt-4">
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={despesasData}>
+                                <BarChart data={despesasPorCategoria}>
                                     <Tooltip
                                         contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333', color: '#fff' }}
+                                        formatter={(value: any) => Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
                                     />
                                     <Bar dataKey="value" fill="#E31E24" radius={[4, 4, 0, 0]} />
                                 </BarChart>
@@ -96,9 +194,12 @@ export default function Dashboard() {
                     <CardContent>
                         <div className="h-[200px] w-full mt-4">
                             <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={lucroData}>
-                                    <Tooltip contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333' }} />
-                                    <Area type="monotone" dataKey="value" stroke="#FFD700" fill="#FFD700" fillOpacity={0.2} strokeWidth={2} />
+                                <AreaChart data={lucroMensal}>
+                                    <Tooltip
+                                        contentStyle={{ backgroundColor: '#1a1a1a', border: '1px solid #333' }}
+                                        formatter={(value: any) => Number(value).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                                    />
+                                    <Area type="monotone" dataKey="value" stroke="#FFD700" fill="#FFD700" fillOpacity={0.2} strokeWidth={2} name="Lucro" />
                                 </AreaChart>
                             </ResponsiveContainer>
                         </div>
@@ -139,7 +240,7 @@ export default function Dashboard() {
                 <Card className="bg-brand-dark border-gray-800 text-white lg:col-span-2">
                     <CardHeader>
                         <CardTitle className="text-lg font-semibold">Vendas Recentes</CardTitle>
-                        <p className="text-xs text-gray-400">Vendas, Lojas, Vendedor</p>
+                        <p className="text-xs text-gray-400">Últimas 5 vendas registradas</p>
                     </CardHeader>
                     <CardContent>
                         <div className="overflow-x-auto">
@@ -149,15 +250,11 @@ export default function Dashboard() {
                                         <th className="pb-3 font-medium">Loja</th>
                                         <th className="pb-3 font-medium">Vendedor</th>
                                         <th className="pb-3 font-medium">Data/Hora</th>
-                                        <th className="pb-3 font-medium">Cotação</th>
+                                        <th className="pb-3 font-medium">Valor</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-800">
-                                    {[
-                                        { loja: 'Filial 01', vendedor: 'Caieta Rdornor Amato', data: '04/01/2023 18:54:53', cotacao: 'R$ 133.900 deserto' },
-                                        { loja: 'Sede Principal', vendedor: 'Sucata Anemior Amato', data: '18/01/2023 19:33:01', cotacao: 'R$ 109.500 v/esperto' },
-                                        { loja: 'Filial 02', vendedor: 'Ricardo Oliveira', data: '22/01/2023 10:15:22', cotacao: 'R$ 87.200 pronto' },
-                                    ].map((sale, i) => (
+                                    {recentSales.map((sale, i) => (
                                         <tr key={i} className="text-gray-300">
                                             <td className="py-4">{sale.loja}</td>
                                             <td className="py-4">{sale.vendedor}</td>
@@ -165,6 +262,13 @@ export default function Dashboard() {
                                             <td className="py-4 font-mono text-brand-yellow font-semibold">{sale.cotacao}</td>
                                         </tr>
                                     ))}
+                                    {recentSales.length === 0 && (
+                                        <tr>
+                                            <td colSpan={4} className="py-8 text-center text-gray-500">
+                                                Nenhuma venda registrada ainda.
+                                            </td>
+                                        </tr>
+                                    )}
                                 </tbody>
                             </table>
                         </div>
