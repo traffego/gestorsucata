@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { Search, Loader2, Calendar, DollarSign, User, ShoppingBag, ChevronDown, ChevronUp } from "lucide-react";
+import { Search, Loader2, Calendar, DollarSign, User, ShoppingBag, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabase";
 
@@ -93,6 +94,44 @@ export default function Vendas() {
         pix: 'PIX'
     };
 
+    const handleDeleteSale = async (e: React.MouseEvent, saleId: string) => {
+        e.stopPropagation(); // Impede expandir o card ao clicar no delete
+
+        if (!confirm("Tem certeza que deseja excluir esta venda? Esta ação não pode ser desfeita e o estoque não será devolvido automaticamente.")) {
+            return;
+        }
+
+        setLoading(true);
+        try {
+            // 1. Excluir itens da venda primeiro (se não houver cascade delete no banco)
+            const { error: itensError } = await supabase
+                .from('itens_venda')
+                .delete()
+                .eq('venda_id', saleId);
+
+            if (itensError) throw itensError;
+
+            // 2. Excluir a venda
+            const { error: vendaError } = await supabase
+                .from('vendas')
+                .delete()
+                .eq('id', saleId);
+
+            if (vendaError) throw vendaError;
+
+            // 3. Atualizar estado local
+            setSales(prev => prev.filter(s => s.id !== saleId));
+
+            // Opcional: Mostrar toast de sucesso
+
+        } catch (error: any) {
+            console.error('Erro ao excluir venda:', error);
+            alert(`Erro ao excluir venda: ${error.message}`);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <div className="space-y-6">
             <Card className="bg-brand-dark border-gray-800 text-white">
@@ -153,8 +192,18 @@ export default function Vendas() {
                                                 <p className="text-xs text-gray-500 uppercase">{paymentLabels[sale.forma_pagamento] || sale.forma_pagamento}</p>
                                             </div>
 
-                                            <div className="text-gray-500">
-                                                {expandedSaleId === sale.id ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                                            <div className="flex items-center gap-2">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 text-gray-500 hover:text-red-500 hover:bg-red-500/10"
+                                                    onClick={(e) => handleDeleteSale(e, sale.id)}
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                                <div className="text-gray-500">
+                                                    {expandedSaleId === sale.id ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>

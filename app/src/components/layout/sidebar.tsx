@@ -17,35 +17,41 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Link, useLocation } from "react-router-dom";
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> { }
 
 export function Sidebar({ className }: SidebarProps) {
+    const location = useLocation();
+
     const menuItems = [
-        { icon: LayoutDashboard, label: "Painel", active: true },
-        { icon: QrCode, label: "QR Code" },
+        { icon: LayoutDashboard, label: "Painel", to: "/" },
+        { icon: QrCode, label: "QR Code", to: "/qrcode" },
+        { icon: ShoppingCart, label: "Nova Venda", to: "/nova-venda" },
+        { icon: History, label: "Minhas Vendas", to: "/vendas" },
         {
             icon: History,
             label: "Cadastros",
+            to: "/cadastros", // Rota principal ou wrapper
             submenu: [
-                { icon: Factory, label: "Cadastro de Sucatas" },
-                { icon: Tag, label: "Cadastro de Peças" },
-                { icon: Package, label: "Categorias de Peças" },
-                { icon: Users, label: "Clientes" },
-                { icon: MapPin, label: "Localizações" },
-                { icon: Truck, label: "Transportadoras" },
-                { icon: UserCheck, label: "Vendedores" },
-                { icon: Factory, label: "Fornecedores" },
+                { icon: Factory, label: "Cadastro de Sucatas", to: "/cadastros/sucatas" },
+                { icon: Tag, label: "Cadastro de Peças", to: "/cadastros/pecas" },
+                { icon: Package, label: "Categorias de Peças", to: "/cadastros/categorias" },
+                { icon: Users, label: "Clientes", to: "/cadastros/clientes" },
+                { icon: MapPin, label: "Localizações", to: "/cadastros/localizacoes" },
+                { icon: Truck, label: "Transportadoras", to: "/cadastros/transportadoras" },
+                { icon: UserCheck, label: "Vendedores", to: "/cadastros/vendedores" },
+                { icon: Factory, label: "Fornecedores", to: "/cadastros/fornecedores" },
             ]
         },
-        { icon: Package, label: "Estoque de peças" },
-        { icon: Factory, label: "Sucatas" },
-        { icon: Tag, label: "Etiquetas" },
-        { icon: ShoppingCart, label: "Vendas" },
-        { icon: Store, label: "Lojas" },
-        { icon: Users, label: "Usuários" },
-        { icon: BarChart3, label: "Relatórios" },
-        { icon: Settings, label: "Configurações" },
+        { icon: Package, label: "Estoque de peças", to: "/estoque" },
+        { icon: Factory, label: "Sucatas", to: "/sucatas" }, // Ajustar rota se necessário
+        { icon: Tag, label: "Etiquetas", to: "/etiquetas" }, // Ajustar rota se necessário
+        { icon: Store, label: "Lojas", to: "/lojas" }, // Ajustar rota se necessário
+        { icon: Users, label: "Usuários", to: "/usuarios" }, // Ajustar rota se necessário
+        { icon: BarChart3, label: "Relatórios", to: "/relatorios" }, // Ajustar rota se necessário
+        { icon: Settings, label: "Configurações", to: "/configuracoes" }, // Ajustar rota se necessário
+        { icon: ShoppingCart, label: "Financeiro", to: "/financeiro" },
     ];
 
     return (
@@ -65,33 +71,40 @@ export function Sidebar({ className }: SidebarProps) {
                 </div>
                 <div className="px-3 py-2">
                     <div className="space-y-1">
-                        {menuItems.map((item) => (
-                            <div key={item.label}>
-                                <Button
-                                    variant={item.active ? "secondary" : "ghost"}
-                                    className={cn(
-                                        "w-full justify-start gap-3",
-                                        item.active ? "bg-white/10 text-white" : "text-gray-400 hover:text-white hover:bg-white/5"
+                        {menuItems.map((item) => {
+                            const isActive = location.pathname === item.to || location.pathname.startsWith(item.to + '/');
+
+                            return (
+                                <div key={item.label}>
+                                    <Link to={item.to}>
+                                        <Button
+                                            variant={isActive ? "secondary" : "ghost"}
+                                            className={cn(
+                                                "w-full justify-start gap-3",
+                                                isActive ? "bg-white/10 text-white" : "text-gray-400 hover:text-white hover:bg-white/5"
+                                            )}
+                                        >
+                                            <item.icon className="h-4 w-4" />
+                                            {item.label}
+                                        </Button>
+                                    </Link>
+                                    {item.submenu && (
+                                        <div className="ml-4 mt-1 space-y-1 border-l border-gray-800 pl-4">
+                                            {item.submenu.map((sub) => (
+                                                <Button
+                                                    key={sub.label}
+                                                    variant="ghost"
+                                                    className="w-full justify-start text-xs text-gray-500 hover:text-white hover:bg-white/5 h-8"
+                                                    disabled // Desativado até implementar rotas de submenu
+                                                >
+                                                    {sub.label}
+                                                </Button>
+                                            ))}
+                                        </div>
                                     )}
-                                >
-                                    <item.icon className="h-4 w-4" />
-                                    {item.label}
-                                </Button>
-                                {item.submenu && (
-                                    <div className="ml-4 mt-1 space-y-1 border-l border-gray-800 pl-4">
-                                        {item.submenu.map((sub) => (
-                                            <Button
-                                                key={sub.label}
-                                                variant="ghost"
-                                                className="w-full justify-start text-xs text-gray-500 hover:text-white hover:bg-white/5 h-8"
-                                            >
-                                                {sub.label}
-                                            </Button>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        ))}
+                                </div>
+                            )
+                        })}
                     </div>
                 </div>
             </div>
