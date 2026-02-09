@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Search, ShoppingCart, Trash2, Plus, Minus, CreditCard, Banknote, QrCode, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,19 +13,37 @@ interface Product {
     stock: string;
 }
 
-const mockProducts: Product[] = [
-    { id: '1', name: 'Sucata Ferro Novo', price: 1.5, type: 'sucata', stock: '500kg' },
-    { id: '2', name: 'Sucata Cobre Mel', price: 42.0, type: 'sucata', stock: '45kg' },
-    { id: '3', name: 'Sucata Alumínio', price: 8.5, type: 'sucata', stock: '120kg' },
-    { id: '4', name: 'Radiador Caminhão', price: 250.0, type: 'peca', stock: '12 un' },
-    { id: '5', name: 'Alternador 12V', price: 180.0, type: 'peca', stock: '8 un' },
-];
-
 export default function NovaVenda() {
+    const [products, setProducts] = useState<Product[]>([]);
+    const [loadingProducts, setLoadingProducts] = useState(true);
     const [cart, setCart] = useState<{ product: Product; quantity: number }[]>([]);
     const [searchTerm, setSearchTerm] = useState("");
     const [paymentMethod, setPaymentMethod] = useState<'dinheiro' | 'cartao' | 'pix' | null>(null);
     const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        async function fetchProducts() {
+            setLoadingProducts(true);
+            const { data, error } = await supabase
+                .from('produtos')
+                .select('id, nome, preco_venda, tipo, estoque_atual, unidade_medida');
+
+            if (error) {
+                console.error('Erro ao buscar produtos:', error);
+            } else if (data) {
+                const mapped: Product[] = data.map((p: any) => ({
+                    id: p.id,
+                    name: p.nome,
+                    price: p.preco_venda || 0,
+                    type: p.tipo as 'sucata' | 'peca',
+                    stock: `${p.estoque_atual || 0} ${p.unidade_medida || 'un'}`
+                }));
+                setProducts(mapped);
+            }
+            setLoadingProducts(false);
+        }
+        fetchProducts();
+    }, []);
 
     const addToCart = (product: Product) => {
         setCart(prev => {
@@ -130,36 +148,45 @@ export default function NovaVenda() {
                         </div>
                     </CardHeader>
                     <CardContent>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {mockProducts.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase())).map(product => (
-                                <div
-                                    key={product.id}
-                                    className="p-4 border border-gray-800 rounded-lg hover:border-brand-yellow transition-colors bg-brand-darker/50 group"
-                                >
-                                    <div className="flex justify-between items-start mb-2">
-                                        <div>
-                                            <h4 className="font-semibold text-gray-200">{product.name}</h4>
-                                            <span className="text-[10px] uppercase font-bold text-brand-yellow px-1.5 py-0.5 border border-brand-yellow/30 rounded">
-                                                {product.type}
+                        {loadingProducts ? (
+                            <div className="flex items-center justify-center py-12">
+                                <Loader2 className="h-8 w-8 animate-spin text-brand-yellow" />
+                                <span className="ml-2 text-gray-400">Carregando produtos...</span>
+                            </div>
+                        ) : products.length === 0 ? (
+                            <p className="text-center text-gray-500 py-8">Nenhum produto cadastrado no banco de dados.</p>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase())).map(product => (
+                                    <div
+                                        key={product.id}
+                                        className="p-4 border border-gray-800 rounded-lg hover:border-brand-yellow transition-colors bg-brand-darker/50 group"
+                                    >
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div>
+                                                <h4 className="font-semibold text-gray-200">{product.name}</h4>
+                                                <span className="text-[10px] uppercase font-bold text-brand-yellow px-1.5 py-0.5 border border-brand-yellow/30 rounded">
+                                                    {product.type}
+                                                </span>
+                                            </div>
+                                            <span className="text-lg font-bold text-white">
+                                                R$ {product.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                             </span>
                                         </div>
-                                        <span className="text-lg font-bold text-white">
-                                            R$ {product.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                        </span>
+                                        <div className="flex justify-between items-center mt-4">
+                                            <span className="text-xs text-gray-500 italic">Estoque: {product.stock}</span>
+                                            <Button
+                                                size="sm"
+                                                className="bg-brand-red hover:bg-brand-red/90 text-white gap-2"
+                                                onClick={() => addToCart(product)}
+                                            >
+                                                <Plus className="h-4 w-4" /> Adicionar
+                                            </Button>
+                                        </div>
                                     </div>
-                                    <div className="flex justify-between items-center mt-4">
-                                        <span className="text-xs text-gray-500 italic">Estoque: {product.stock}</span>
-                                        <Button
-                                            size="sm"
-                                            className="bg-brand-red hover:bg-brand-red/90 text-white gap-2"
-                                            onClick={() => addToCart(product)}
-                                        >
-                                            <Plus className="h-4 w-4" /> Adicionar
-                                        </Button>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+                                ))}
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
             </div>
