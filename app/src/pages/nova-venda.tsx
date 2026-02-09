@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Search, ShoppingCart, Trash2, Plus, Minus, CreditCard, Banknote, QrCode } from "lucide-react";
+import { Search, ShoppingCart, Trash2, Plus, Minus, CreditCard, Banknote, QrCode, Loader2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { supabase } from "@/lib/supabase";
 
 interface Product {
     id: string;
@@ -24,6 +25,7 @@ export default function NovaVenda() {
     const [cart, setCart] = useState<{ product: Product; quantity: number }[]>([]);
     const [searchTerm, setSearchTerm] = useState("");
     const [paymentMethod, setPaymentMethod] = useState<'dinheiro' | 'cartao' | 'pix' | null>(null);
+    const [loading, setLoading] = useState(false);
 
     const addToCart = (product: Product) => {
         setCart(prev => {
@@ -53,7 +55,7 @@ export default function NovaVenda() {
 
     const total = cart.reduce((acc, item) => acc + (item.product.price * item.quantity), 0);
 
-    const handleFinalizeSale = () => {
+    const handleFinalizeSale = async () => {
         if (cart.length === 0) {
             alert('Adicione pelo menos um item ao carrinho.');
             return;
@@ -63,16 +65,52 @@ export default function NovaVenda() {
             return;
         }
 
-        const paymentLabels = {
-            dinheiro: 'Dinheiro',
-            cartao: 'Cartão',
-            pix: 'PIX'
-        };
+        setLoading(true);
 
-        alert(`Venda finalizada!\n\nTotal: R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\nForma de pagamento: ${paymentLabels[paymentMethod]}`);
+        try {
+            // 1. Inserir a venda
+            const { data: venda, error: vendaError } = await supabase
+                .from('vendas')
+                .insert([{
+                    valor_total: total,
+                    forma_pagamento: paymentMethod,
+                    status: 'concluida'
+                }])
+                .select()
+                .single();
 
-        setCart([]);
-        setPaymentMethod(null);
+            if (vendaError) throw vendaError;
+
+            // 2. Inserir os itens da venda
+            const itensParaInserir = cart.map(item => ({
+                venda_id: venda.id,
+                produto_id: item.product.id,
+                quantidade: item.quantity,
+                preco_unitario: item.product.price
+            }));
+
+            const { error: itensError } = await supabase
+                .from('itens_venda')
+                .insert(itensParaInserir);
+
+            if (itensError) throw itensError;
+
+            const paymentLabels = {
+                dinheiro: 'Dinheiro',
+                cartao: 'Cartão',
+                pix: 'PIX'
+            };
+
+            alert(`Venda finalizada e salva com sucesso!\n\nTotal: R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\nForma de pagamento: ${paymentLabels[paymentMethod]}`);
+
+            setCart([]);
+            setPaymentMethod(null);
+        } catch (error: any) {
+            console.error('Erro ao salvar venda:', error);
+            alert(`Erro ao finalizar venda: ${error.message || 'Erro desconhecido'}\n\nVerifique se o Supabase está configurado corretamente.`);
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -211,8 +249,16 @@ export default function NovaVenda() {
                             <Button
                                 className="w-full bg-brand-red hover:bg-brand-red/90 h-12 text-lg font-bold mt-4 shadow-lg shadow-brand-red/20"
                                 onClick={handleFinalizeSale}
+                                disabled={loading}
                             >
-                                Finalizar Venda
+                                {loading ? (
+                                    <>
+                                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                        Processando...
+                                    </>
+                                ) : (
+                                    'Finalizar Venda'
+                                )}
                             </Button>
                         </div>
                     </CardContent>
