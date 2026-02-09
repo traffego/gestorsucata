@@ -23,6 +23,7 @@ const mockProducts: Product[] = [
 export default function NovaVenda() {
     const [cart, setCart] = useState<{ product: Product; quantity: number }[]>([]);
     const [searchTerm, setSearchTerm] = useState("");
+    const [paymentMethod, setPaymentMethod] = useState<'dinheiro' | 'cartao' | 'pix' | null>(null);
 
     const addToCart = (product: Product) => {
         setCart(prev => {
@@ -51,6 +52,28 @@ export default function NovaVenda() {
     };
 
     const total = cart.reduce((acc, item) => acc + (item.product.price * item.quantity), 0);
+
+    const handleFinalizeSale = () => {
+        if (cart.length === 0) {
+            alert('Adicione pelo menos um item ao carrinho.');
+            return;
+        }
+        if (!paymentMethod) {
+            alert('Selecione uma forma de pagamento.');
+            return;
+        }
+
+        const paymentLabels = {
+            dinheiro: 'Dinheiro',
+            cartao: 'Cartão',
+            pix: 'PIX'
+        };
+
+        alert(`Venda finalizada!\n\nTotal: R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\nForma de pagamento: ${paymentLabels[paymentMethod]}`);
+
+        setCart([]);
+        setPaymentMethod(null);
+    };
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -162,18 +185,33 @@ export default function NovaVenda() {
                             </div>
 
                             <div className="grid grid-cols-2 gap-2">
-                                <Button variant="outline" className="border-gray-700 bg-transparent hover:bg-white/5 gap-2">
+                                <Button
+                                    variant="outline"
+                                    className={`border-gray-700 gap-2 ${paymentMethod === 'dinheiro' ? 'bg-brand-yellow text-black border-brand-yellow' : 'bg-transparent hover:bg-white/5'}`}
+                                    onClick={() => setPaymentMethod('dinheiro')}
+                                >
                                     <Banknote className="h-4 w-4" /> Dinheiro
                                 </Button>
-                                <Button variant="outline" className="border-gray-700 bg-transparent hover:bg-white/5 gap-2">
+                                <Button
+                                    variant="outline"
+                                    className={`border-gray-700 gap-2 ${paymentMethod === 'cartao' ? 'bg-brand-yellow text-black border-brand-yellow' : 'bg-transparent hover:bg-white/5'}`}
+                                    onClick={() => setPaymentMethod('cartao')}
+                                >
                                     <CreditCard className="h-4 w-4" /> Cartão
                                 </Button>
-                                <Button variant="outline" className="border-gray-700 bg-transparent hover:bg-white/5 gap-2 col-span-2">
+                                <Button
+                                    variant="outline"
+                                    className={`border-gray-700 gap-2 col-span-2 ${paymentMethod === 'pix' ? 'bg-brand-yellow text-black border-brand-yellow' : 'bg-transparent hover:bg-white/5'}`}
+                                    onClick={() => setPaymentMethod('pix')}
+                                >
                                     <QrCode className="h-4 w-4" /> PIX
                                 </Button>
                             </div>
 
-                            <Button className="w-full bg-brand-red hover:bg-brand-red/90 h-12 text-lg font-bold mt-4 shadow-lg shadow-brand-red/20">
+                            <Button
+                                className="w-full bg-brand-red hover:bg-brand-red/90 h-12 text-lg font-bold mt-4 shadow-lg shadow-brand-red/20"
+                                onClick={handleFinalizeSale}
+                            >
                                 Finalizar Venda
                             </Button>
                         </div>
