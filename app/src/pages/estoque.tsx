@@ -99,8 +99,35 @@ export default function Estoque() {
         setEditingProduct(null);
     };
 
+    // Helper functions for masks
+    const formatCurrency = (value: number) => {
+        return new Intl.NumberFormat('pt-BR', {
+            style: 'currency',
+            currency: 'BRL',
+        }).format(value);
+    };
+
+    const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        // Remove everything but numbers
+        const value = e.target.value.replace(/\D/g, "");
+        // Convert to cents
+        const cents = Number(value) / 100;
+        setFormData({ ...formData, preco_venda: cents });
+    };
+
+    const handleSKUChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setFormData({ ...formData, sku: e.target.value.toUpperCase() });
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        // Basic validation
+        if (!formData.nome || !formData.sku) {
+            alert('Nome e SKU são obrigatórios.');
+            return;
+        }
+
         setLoading(true);
         try {
             if (editingProduct) {
@@ -384,7 +411,7 @@ export default function Estoque() {
                     <div className="space-y-2 col-span-2">
                         <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Nome do Produto</label>
                         <Input
-                            value={formData.nome}
+                            value={formData.nome || ""}
                             onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
                             className="bg-brand-darker border-gray-800 text-white focus:border-brand-yellow"
                             placeholder="Ex: Alumínio Batido"
@@ -393,16 +420,16 @@ export default function Estoque() {
                     <div className="space-y-2">
                         <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">SKU / Código</label>
                         <Input
-                            value={formData.sku}
-                            onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
-                            className="bg-brand-darker border-gray-800 text-white focus:border-brand-yellow"
+                            value={formData.sku || ""}
+                            onChange={handleSKUChange}
+                            className="bg-brand-darker border-gray-800 text-white focus:border-brand-yellow uppercase"
                             placeholder="GS-001"
                         />
                     </div>
                     <div className="space-y-2">
                         <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Categoria</label>
                         <Input
-                            value={formData.categoria}
+                            value={formData.categoria || ""}
                             onChange={(e) => setFormData({ ...formData, categoria: e.target.value })}
                             className="bg-brand-darker border-gray-800 text-white focus:border-brand-yellow"
                             placeholder="Ex: Sucatas"
@@ -411,11 +438,9 @@ export default function Estoque() {
                     <div className="space-y-2">
                         <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Preço de Venda (R$)</label>
                         <Input
-                            type="number"
-                            step="0.01"
-                            value={formData.preco_venda}
-                            onChange={(e) => setFormData({ ...formData, preco_venda: Number(e.target.value) })}
-                            className="bg-brand-darker border-gray-800 text-white focus:border-brand-yellow"
+                            value={formatCurrency(formData.preco_venda || 0)}
+                            onChange={handlePriceChange}
+                            className="bg-brand-darker border-gray-800 text-white focus:border-brand-yellow font-bold text-brand-yellow"
                         />
                     </div>
                     <div className="space-y-2">
@@ -435,8 +460,9 @@ export default function Estoque() {
                         <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Estoque Atual</label>
                         <Input
                             type="number"
+                            min="0"
                             value={formData.estoque_atual}
-                            onChange={(e) => setFormData({ ...formData, estoque_atual: Number(e.target.value) })}
+                            onChange={(e) => setFormData({ ...formData, estoque_atual: Math.max(0, Number(e.target.value)) })}
                             className="bg-brand-darker border-gray-800 text-white focus:border-brand-yellow"
                         />
                     </div>
@@ -444,15 +470,16 @@ export default function Estoque() {
                         <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Estoque Mínimo</label>
                         <Input
                             type="number"
+                            min="0"
                             value={formData.estoque_minimo}
-                            onChange={(e) => setFormData({ ...formData, estoque_minimo: Number(e.target.value) })}
+                            onChange={(e) => setFormData({ ...formData, estoque_minimo: Math.max(0, Number(e.target.value)) })}
                             className="bg-brand-darker border-gray-800 text-white focus:border-brand-yellow"
                         />
                     </div>
                     <div className="space-y-2 col-span-2">
                         <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Localização</label>
                         <Input
-                            value={formData.localizacao}
+                            value={formData.localizacao || ""}
                             onChange={(e) => setFormData({ ...formData, localizacao: e.target.value })}
                             className="bg-brand-darker border-gray-800 text-white focus:border-brand-yellow"
                             placeholder="Ex: Galpão A - Prateleira 2"
