@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Product {
     id: string;
@@ -14,6 +15,7 @@ interface Product {
 }
 
 export default function NovaVenda() {
+    const { user } = useAuth();
     const [products, setProducts] = useState<Product[]>([]);
     const [loadingProducts, setLoadingProducts] = useState(true);
     const [cart, setCart] = useState<{ product: Product; quantity: number }[]>([]);
@@ -92,7 +94,8 @@ export default function NovaVenda() {
                 .insert([{
                     valor_total: total,
                     forma_pagamento: paymentMethod,
-                    status: 'concluida'
+                    status: 'concluida',
+                    usuario_id: user?.id // Registrar o vendedor
                 }])
                 .select()
                 .single();

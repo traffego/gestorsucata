@@ -25,6 +25,7 @@ export default function Dashboard() {
     const [lucroMensal, setLucroMensal] = useState<any[]>([]);
     const [girodeEstoqueData, setGirodeEstoqueData] = useState<any[]>([]);
     const [performanceVendedor, setPerformanceVendedor] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         fetchDashboardData();
@@ -33,8 +34,15 @@ export default function Dashboard() {
     async function fetchDashboardData() {
         setLoading(true);
         try {
-            // 1. Fetch Recent Sales with nested user data
-            const { data: vendas } = await supabase
+            // 0. Fetch Users for mapping
+            const { data: userData } = await supabase.from('usuarios').select('id, nome');
+            const userMap: Record<string, string> = {};
+            if (userData) {
+                userData.forEach(u => userMap[u.id] = u.nome);
+            }
+
+            // 1. Fetch Recent Sales with better error handling
+            const { data: vendas, error: salesError } = await supabase
                 .from('vendas')
                 .select(`
                     id,
@@ -42,18 +50,22 @@ export default function Dashboard() {
                     data_venda,
                     forma_pagamento,
                     cliente:clientes(nome),
-                    vendedor:usuarios(nome) 
+                    usuario_id
                 `)
                 .order('data_venda', { ascending: false })
                 .limit(5);
 
+            if (salesError) {
+                console.error('Erro ao buscar vendas recentes:', salesError);
+            }
+
             if (vendas) {
                 setRecentSales(vendas.map((v: any) => {
-                    const vendedorNome = Array.isArray(v.vendedor) ? v.vendedor[0]?.nome : v.vendedor?.nome;
+                    const vendedorNome = v.usuario_id ? userMap[v.usuario_id] : 'Sistema';
                     return {
                         loja: 'Principal',
                         vendedor: vendedorNome || 'Sistema',
-                        data: new Date(v.data_venda).toLocaleString('pt-BR'),
+                        data: v.data_venda ? new Date(v.data_venda).toLocaleString('pt-BR') : 'Sem data',
                         cotacao: (v.valor_total || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
                     };
                 }));
@@ -63,18 +75,22 @@ export default function Dashboard() {
             const thirtyDaysAgo = new Date();
             thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-            const { data: sellerSales } = await supabase
+            const { data: sellerSales, error: performanceError } = await supabase
                 .from('vendas')
-                .select('valor_total, usuario_id, usuarios(nome)')
+                .select('valor_total, usuario_id')
                 .gte('data_venda', thirtyDaysAgo.toISOString());
+
+            if (performanceError) {
+                console.error('Erro ao buscar performance de vendedores:', performanceError);
+            }
 
             if (sellerSales) {
                 const salesBySeller: Record<string, { total: number, name: string }> = {};
                 let maxTotal = 0;
 
                 sellerSales.forEach((s: any) => {
-                    const name = s.usuarios?.nome || 'Outros';
                     const id = s.usuario_id || 'unknown';
+                    const name = userMap[id] || 'Outros';
                     if (!salesBySeller[id]) salesBySeller[id] = { total: 0, name };
                     salesBySeller[id].total += Number(s.valor_total || 0);
                     if (salesBySeller[id].total > maxTotal) maxTotal = salesBySeller[id].total;
