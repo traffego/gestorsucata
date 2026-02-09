@@ -22,6 +22,7 @@ dist/
 
 # Local env files
 .env*.local
+.env
 
 # Build
 build/
