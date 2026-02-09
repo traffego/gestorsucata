@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route, Link, useLocation } from "react-router-dom";
 import { Layout } from './components/layout/layout';
+import { AuthProvider } from './contexts/AuthContext';
+import { AuthGuard } from './components/auth/AuthGuard';
 import Dashboard from './pages/dashboard';
 import NovaVenda from './pages/nova-venda';
 import Estoque from './pages/estoque';
@@ -7,6 +9,8 @@ import Financeiro from './pages/financeiro';
 import QRCodeModule from './pages/qrcode';
 import Cadastros from './pages/cadastros';
 import Vendas from './pages/vendas';
+import Login from './pages/login';
+import ForgotPassword from './pages/forgot-password';
 
 function NavButton({ to, label, icon: Icon }: { to: string; label: string; icon?: any }) {
   const location = useLocation();
@@ -27,38 +31,51 @@ function NavButton({ to, label, icon: Icon }: { to: string; label: string; icon?
   );
 }
 
+function ProtectedLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <AuthGuard>
+      <Layout>
+        <div className="mb-8 flex flex-wrap gap-2 p-1.5 bg-brand-dark border border-gray-800 rounded-xl w-fit shadow-2xl">
+          <NavButton to="/" label="Painel" />
+          <NavButton to="/nova-venda" label="Nova Venda" />
+          <NavButton to="/vendas" label="Minhas Vendas" />
+          <NavButton to="/estoque" label="Estoque" />
+          <NavButton to="/financeiro" label="Financeiro" />
+          <NavButton to="/qrcode" label="QR Code" />
+          <NavButton to="/cadastros" label="Cadastros" />
+        </div>
+        <div className="relative">
+          {children}
+        </div>
+      </Layout>
+    </AuthGuard>
+  );
+}
+
 function AppContent() {
   return (
-    <Layout>
-      <div className="mb-8 flex flex-wrap gap-2 p-1.5 bg-brand-dark border border-gray-800 rounded-xl w-fit shadow-2xl">
-        <NavButton to="/" label="Painel" />
-        <NavButton to="/nova-venda" label="Nova Venda" />
-        <NavButton to="/vendas" label="Minhas Vendas" />
-        <NavButton to="/estoque" label="Estoque" />
-        <NavButton to="/financeiro" label="Financeiro" />
-        <NavButton to="/qrcode" label="QR Code" />
-        <NavButton to="/cadastros" label="Cadastros" />
-      </div>
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
 
-      <div className="relative">
-        <Routes>
-          <Route path="/" element={<div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><Dashboard /></div>} />
-          <Route path="/nova-venda" element={<div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><NovaVenda /></div>} />
-          <Route path="/vendas" element={<div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><Vendas /></div>} />
-          <Route path="/estoque" element={<div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><Estoque /></div>} />
-          <Route path="/financeiro" element={<div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><Financeiro /></div>} />
-          <Route path="/qrcode" element={<div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><QRCodeModule /></div>} />
-          <Route path="/cadastros" element={<div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><Cadastros /></div>} />
-        </Routes>
-      </div>
-    </Layout>
+      {/* Protected Routes */}
+      <Route path="/" element={<ProtectedLayout><div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><Dashboard /></div></ProtectedLayout>} />
+      <Route path="/nova-venda" element={<ProtectedLayout><div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><NovaVenda /></div></ProtectedLayout>} />
+      <Route path="/vendas" element={<ProtectedLayout><div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><Vendas /></div></ProtectedLayout>} />
+      <Route path="/estoque" element={<ProtectedLayout><div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><Estoque /></div></ProtectedLayout>} />
+      <Route path="/financeiro" element={<ProtectedLayout><div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><Financeiro /></div></ProtectedLayout>} />
+      <Route path="/qrcode" element={<ProtectedLayout><div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><QRCodeModule /></div></ProtectedLayout>} />
+      <Route path="/cadastros" element={<ProtectedLayout><div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><Cadastros /></div></ProtectedLayout>} />
+    </Routes>
   );
 }
 
 function App() {
   return (
     <BrowserRouter>
-      <AppContent />
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
     </BrowserRouter>
   );
 }
