@@ -34,41 +34,41 @@ export default function NovaVenda() {
     const [paymentMethod, setPaymentMethod] = useState<'dinheiro' | 'cartao' | 'pix' | null>(null);
     const [loading, setLoading] = useState(false);
 
+    async function fetchProducts() {
+        setLoadingProducts(true);
+        const { data, error } = await supabase
+            .from('produtos')
+            .select('id, nome, preco_venda, tipo, estoque_atual, unidade_medida');
+
+        if (error) {
+            console.error('Erro ao buscar produtos:', error);
+        } else if (data) {
+            const mapped: Product[] = data.map((p: any) => ({
+                id: p.id,
+                name: p.nome,
+                price: p.preco_venda || 0,
+                type: p.tipo as 'sucata' | 'peca',
+                stock: `${p.estoque_atual || 0} ${p.unidade_medida || 'un'}`
+            }));
+            setProducts(mapped);
+        }
+        setLoadingProducts(false);
+    }
+
+    async function fetchClients() {
+        const { data, error } = await supabase
+            .from('clientes')
+            .select('id, nome')
+            .order('nome');
+
+        if (error) {
+            console.error('Erro ao buscar clientes:', error);
+        } else if (data) {
+            setClients(data);
+        }
+    }
+
     useEffect(() => {
-        async function fetchProducts() {
-            setLoadingProducts(true);
-            const { data, error } = await supabase
-                .from('produtos')
-                .select('id, nome, preco_venda, tipo, estoque_atual, unidade_medida');
-
-            if (error) {
-                console.error('Erro ao buscar produtos:', error);
-            } else if (data) {
-                const mapped: Product[] = data.map((p: any) => ({
-                    id: p.id,
-                    name: p.nome,
-                    price: p.preco_venda || 0,
-                    type: p.tipo as 'sucata' | 'peca',
-                    stock: `${p.estoque_atual || 0} ${p.unidade_medida || 'un'}`
-                }));
-                setProducts(mapped);
-            }
-            setLoadingProducts(false);
-        }
-
-        async function fetchClients() {
-            const { data, error } = await supabase
-                .from('clientes')
-                .select('id, nome')
-                .order('nome');
-
-            if (error) {
-                console.error('Erro ao buscar clientes:', error);
-            } else if (data) {
-                setClients(data);
-            }
-        }
-
         fetchProducts();
         fetchClients();
     }, []);
