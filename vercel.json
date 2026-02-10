@@ -2,12 +2,16 @@
     "outputDirectory": "app/dist",
     "rewrites": [
         {
-            "source": "/app/(.*)",
-            "destination": "/app/index.html"
+            "source": "/app/(.*\\..*)",
+            "destination": "/$1"
+        },
+        {
+            "source": "/app/((?!.*\\.).*)",
+            "destination": "/index.html"
         },
         {
             "source": "/app",
-            "destination": "/app/index.html"
+            "destination": "/index.html"
         }
     ]
 }
