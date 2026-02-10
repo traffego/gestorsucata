@@ -1,12 +1,22 @@
 import { Sidebar } from "./sidebar";
 import { Button } from "@/components/ui/button";
 import { User, LogOut, Bell, ShoppingCart } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 interface LayoutProps {
     children: React.ReactNode;
 }
 
 export function Layout({ children }: LayoutProps) {
+    const { user, signOut } = useAuth();
+    const navigate = useNavigate();
+
+    const handleSignOut = async () => {
+        await signOut();
+        navigate('/login');
+    };
+
     return (
         <div className="flex h-screen bg-brand-darker text-white">
             <Sidebar className="w-64 hidden md:block" />
@@ -30,13 +40,18 @@ export function Layout({ children }: LayoutProps) {
                         </div>
                         <div className="flex items-center gap-3 border-l pl-6 border-gray-800">
                             <div className="flex flex-col items-end">
-                                <span className="text-sm font-medium">ADMIN</span>
-                                <span className="text-[10px] text-gray-400">(Dono)</span>
+                                <span className="text-sm font-medium uppercase">{user?.email?.split('@')[0] || "USUÁRIO"}</span>
+                                <span className="text-[10px] text-gray-400">({user?.email || "Conectado"})</span>
                             </div>
-                            <div className="h-10 w-10 rounded-full bg-gray-800 flex items-center justify-center">
+                            <div className="h-10 w-10 rounded-full bg-gray-800 flex items-center justify-center overflow-hidden">
                                 <User className="h-6 w-6 text-gray-400" />
                             </div>
-                            <Button variant="outline" size="sm" className="hidden lg:flex gap-2 border-gray-700 bg-transparent text-gray-400 hover:bg-white/5 hover:text-white">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handleSignOut}
+                                className="hidden lg:flex gap-2 border-gray-700 bg-transparent text-gray-400 hover:bg-white/5 hover:text-white"
+                            >
                                 <LogOut className="h-4 w-4" />
                                 Logout
                             </Button>

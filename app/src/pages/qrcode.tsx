@@ -5,10 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { QRCodeSVG } from 'qrcode.react';
 import { cn } from "@/lib/utils";
-import { useAuth } from "@/contexts/AuthContext";
 
 export default function QRCodeModule() {
-    const { user } = useAuth();
     const [qrValue, setQrValue] = useState("GSPRO-SCAN");
     const [type, setType] = useState<'produto' | 'venda' | 'usuario'>('produto');
     const [generationDate, setGenerationDate] = useState("");
@@ -120,14 +118,10 @@ export default function QRCodeModule() {
                         </Button>
                     </div>
 
-                    <div className="mt-12 grid grid-cols-2 gap-8 text-left w-full max-w-md mx-auto border-t border-gray-800 pt-8">
+                    <div className="mt-12 grid grid-cols-1 gap-8 text-center w-full max-w-md mx-auto border-t border-gray-800 pt-8">
                         <div>
                             <span className="text-[10px] font-bold text-gray-500 uppercase block mb-1">Data Geração</span>
                             <span className="text-sm">{generationDate}</span>
-                        </div>
-                        <div>
-                            <span className="text-[10px] font-bold text-gray-500 uppercase block mb-1">Autorizado por</span>
-                            <span className="text-sm truncate block max-w-[150px]">{user?.email || "Usuário não identificado"}</span>
                         </div>
                     </div>
                 </Card>

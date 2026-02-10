@@ -6,7 +6,6 @@ import {
     Users,
     BarChart3,
     Settings,
-    LogOut,
     QrCode,
     Tag,
     Truck,
@@ -17,21 +16,12 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-
-import { useAuth } from "@/contexts/AuthContext";
+import { Link, useLocation } from "react-router-dom";
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> { }
 
 export function Sidebar({ className }: SidebarProps) {
     const location = useLocation();
-    const { signOut, user } = useAuth();
-    const navigate = useNavigate();
-
-    const handleSignOut = async () => {
-        await signOut();
-        navigate('/login');
-    };
 
     const menuItems = [
         { icon: LayoutDashboard, label: "Painel", to: "/" },
@@ -116,22 +106,6 @@ export function Sidebar({ className }: SidebarProps) {
                         })}
                     </div>
                 </div>
-            </div>
-            <div className="absolute bottom-4 w-full px-3 space-y-2">
-                {user && (
-                    <div className="px-3 py-2 text-[10px] text-gray-500 border-t border-gray-800 pt-4">
-                        Conectado como:<br />
-                        <span className="text-gray-300 font-medium truncate block">{user.email}</span>
-                    </div>
-                )}
-                <Button
-                    variant="ghost"
-                    className="w-full justify-start gap-3 text-gray-400 hover:text-white hover:bg-white/5"
-                    onClick={handleSignOut}
-                >
-                    <LogOut className="h-4 w-4" />
-                    Sair
-                </Button>
             </div>
         </div>
     );
