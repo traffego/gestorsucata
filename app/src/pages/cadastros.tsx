@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import {
     Plus, Search, MoreHorizontal,
     Factory, Tag, Package, Users, Truck, UserCheck, MapPin, Loader2
@@ -32,7 +33,9 @@ const ENTITIES: EntityConfig[] = [
 ];
 
 export default function Cadastros() {
-    const [activeEntity, setActiveEntity] = useState<EntityType>('clientes');
+    const { type } = useParams();
+    const navigate = useNavigate();
+    const [activeEntity, setActiveEntity] = useState<EntityType>((type as EntityType) || 'clientes');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const [data, setData] = useState<any[]>([]);
@@ -42,8 +45,19 @@ export default function Cadastros() {
     const [formData, setFormData] = useState<any>({});
 
     useEffect(() => {
+        if (type && type !== activeEntity && ENTITIES.some(e => e.id === type)) {
+            setActiveEntity(type as EntityType);
+        }
+    }, [type]);
+
+    useEffect(() => {
         fetchEntityData();
     }, [activeEntity]);
+
+    const handleEntityChange = (id: EntityType) => {
+        setActiveEntity(id);
+        navigate(`/cadastros/${id}`);
+    };
 
     const handleSave = async () => {
         setSaving(true);
@@ -157,7 +171,7 @@ export default function Cadastros() {
                 {ENTITIES.map((entity) => (
                     <button
                         key={entity.id}
-                        onClick={() => setActiveEntity(entity.id)}
+                        onClick={() => handleEntityChange(entity.id)}
                         className={cn(
                             "flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all whitespace-nowrap text-sm font-bold",
                             activeEntity === entity.id

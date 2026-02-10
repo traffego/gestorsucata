@@ -90,14 +90,17 @@ export function Sidebar({ className }: SidebarProps) {
                                     {item.submenu && (
                                         <div className="ml-4 mt-1 space-y-1 border-l border-gray-800 pl-4">
                                             {item.submenu.map((sub) => (
-                                                <Button
-                                                    key={sub.label}
-                                                    variant="ghost"
-                                                    className="w-full justify-start text-xs text-gray-500 hover:text-white hover:bg-white/5 h-8"
-                                                    disabled // Desativado até implementar rotas de submenu
-                                                >
-                                                    {sub.label}
-                                                </Button>
+                                                <Link key={sub.label} to={sub.to}>
+                                                    <Button
+                                                        variant="ghost"
+                                                        className={cn(
+                                                            "w-full justify-start text-xs h-8",
+                                                            location.pathname === sub.to ? "text-brand-yellow font-bold" : "text-gray-500 hover:text-white hover:bg-white/5"
+                                                        )}
+                                                    >
+                                                        {sub.label}
+                                                    </Button>
+                                                </Link>
                                             ))}
                                         </div>
                                     )}
