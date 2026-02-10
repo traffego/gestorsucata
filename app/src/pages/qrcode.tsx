@@ -1,14 +1,25 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Download, Copy, RefreshCw, Smartphone, Package, Tag, User } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { QRCodeSVG } from 'qrcode.react';
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function QRCodeModule() {
-    const [qrValue, setQrValue] = useState("GSPRO-665231");
+    const { user } = useAuth();
+    const [qrValue, setQrValue] = useState("GSPRO-SCAN");
     const [type, setType] = useState<'produto' | 'venda' | 'usuario'>('produto');
+    const [generationDate, setGenerationDate] = useState("");
+
+    useEffect(() => {
+        setGenerationDate(new Date().toLocaleString('pt-BR'));
+    }, []);
+
+    const handleRefresh = () => {
+        setGenerationDate(new Date().toLocaleString('pt-BR'));
+    };
 
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -63,7 +74,10 @@ export default function QRCodeModule() {
                             />
                         </div>
 
-                        <Button className="w-full bg-brand-yellow text-brand-dark font-bold hover:bg-brand-yellow/80 gap-2">
+                        <Button
+                            onClick={handleRefresh}
+                            className="w-full bg-brand-yellow text-brand-dark font-bold hover:bg-brand-yellow/80 gap-2"
+                        >
                             <RefreshCw className="h-4 w-4" /> Atualizar Código
                         </Button>
                     </CardContent>
@@ -109,11 +123,11 @@ export default function QRCodeModule() {
                     <div className="mt-12 grid grid-cols-2 gap-8 text-left w-full max-w-md mx-auto border-t border-gray-800 pt-8">
                         <div>
                             <span className="text-[10px] font-bold text-gray-500 uppercase block mb-1">Data Geração</span>
-                            <span className="text-sm">27/01/2026 - 16:30</span>
+                            <span className="text-sm">{generationDate}</span>
                         </div>
                         <div>
                             <span className="text-[10px] font-bold text-gray-500 uppercase block mb-1">Autorizado por</span>
-                            <span className="text-sm">Vendedor Admin</span>
+                            <span className="text-sm truncate block max-w-[150px]">{user?.email || "Usuário não identificado"}</span>
                         </div>
                     </div>
                 </Card>
