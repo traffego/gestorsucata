@@ -23,7 +23,7 @@ interface EntityConfig {
 const ENTITIES: EntityConfig[] = [
     { id: 'sucatas', label: 'Sucatas', icon: Factory, color: 'text-brand-red', table: 'produtos' },
     { id: 'pecas', label: 'Peças', icon: Tag, color: 'text-brand-yellow', table: 'produtos' },
-    { id: 'categorias', label: 'Categorias', icon: Package, color: 'text-blue-500', table: 'produtos' },
+    { id: 'categorias', label: 'Categorias', icon: Package, color: 'text-blue-500', table: 'categorias' },
     { id: 'clientes', label: 'Clientes', icon: Users, color: 'text-green-500', table: 'clientes' },
     { id: 'localizacoes', label: 'Localizações', icon: MapPin, color: 'text-purple-500', table: 'produtos' },
     { id: 'transportadoras', label: 'Transportadoras', icon: Truck, color: 'text-orange-500', table: 'transportadoras' },
@@ -37,10 +37,58 @@ export default function Cadastros() {
     const [searchTerm, setSearchTerm] = useState("");
     const [data, setData] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [editingItem, setEditingItem] = useState<any | null>(null);
+    const [formData, setFormData] = useState<any>({});
 
     useEffect(() => {
         fetchEntityData();
     }, [activeEntity]);
+
+    const handleSave = async () => {
+        setSaving(true);
+        const config = ENTITIES.find(e => e.id === activeEntity)!;
+        try {
+            if (editingItem) {
+                const { error } = await supabase
+                    .from(config.table)
+                    .update(formData)
+                    .eq('id', editingItem.id);
+                if (error) throw error;
+            } else {
+                const { error } = await supabase
+                    .from(config.table)
+                    .insert([formData]);
+                if (error) throw error;
+            }
+            await fetchEntityData();
+            setIsModalOpen(false);
+        } catch (error) {
+            console.error('Error saving:', error);
+            alert('Erro ao salvar registro.');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleDelete = async (id: any) => {
+        if (!confirm('Tem certeza que deseja excluir este registro?')) return;
+        setLoading(true);
+        const config = ENTITIES.find(e => e.id === activeEntity)!;
+        try {
+            const { error } = await supabase
+                .from(config.table)
+                .delete()
+                .eq('id', id);
+            if (error) throw error;
+            await fetchEntityData();
+        } catch (error) {
+            console.error('Error deleting:', error);
+            alert('Erro ao excluir registro.');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     async function fetchEntityData() {
         setLoading(true);
@@ -53,13 +101,6 @@ export default function Cadastros() {
                 query = query.eq('tipo', 'sucata');
             } else if (activeEntity === 'pecas') {
                 query = query.eq('tipo', 'peca');
-            } else if (activeEntity === 'categorias') {
-                // For categories, we might want unique ones if there's no dedicated table
-                const { data: prods } = await supabase.from('produtos').select('categoria');
-                const uniqueCats = Array.from(new Set(prods?.map(p => p.categoria).filter(Boolean)));
-                setData(uniqueCats.map((name, i) => ({ id: i, nome: name, info: 'Categoria de Produto' })));
-                setLoading(false);
-                return;
             } else if (activeEntity === 'localizacoes') {
                 const { data: prods } = await supabase.from('produtos').select('localizacao');
                 const uniqueLocs = Array.from(new Set(prods?.map(p => p.localizacao).filter(Boolean)));
@@ -100,7 +141,11 @@ export default function Cadastros() {
                     <p className="text-gray-500 text-sm">Gerencie {currentEntity.label.toLowerCase()} do sistema GS PRO.</p>
                 </div>
                 <Button
-                    onClick={() => setIsModalOpen(true)}
+                    onClick={() => {
+                        setEditingItem(null);
+                        setFormData({});
+                        setIsModalOpen(true);
+                    }}
                     className="bg-brand-yellow text-brand-dark font-black hover:bg-brand-yellow/90 uppercase tracking-widest px-8"
                 >
                     <Plus className="h-4 w-4 mr-2 stroke-[3px]" /> Novo {currentEntity.label.slice(0, -1)}
@@ -205,11 +250,23 @@ export default function Cadastros() {
                                 </div>
 
                                 <div className="bg-brand-darker/50 p-6 flex flex-row md:flex-col justify-center items-center gap-4 border-t md:border-t-0 md:border-l border-gray-800 min-w-[180px]">
-                                    <Button variant="outline" className="w-full border-gray-800 bg-brand-dark h-11 text-xs font-bold uppercase hover:bg-brand-yellow hover:text-brand-dark transition-all">
-                                        Detalhes
-                                    </Button>
-                                    <Button variant="outline" className="w-full border-gray-800 bg-brand-dark h-11 text-xs font-bold uppercase hover:bg-brand-red hover:text-white transition-all">
+                                    <Button
+                                        variant="outline"
+                                        className="w-full border-gray-800 bg-brand-dark h-11 text-xs font-bold uppercase hover:bg-brand-yellow hover:text-brand-dark transition-all"
+                                        onClick={() => {
+                                            setEditingItem(item);
+                                            setFormData(item);
+                                            setIsModalOpen(true);
+                                        }}
+                                    >
                                         Editar
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        className="w-full border-gray-800 bg-brand-dark h-11 text-xs font-bold uppercase hover:bg-brand-red hover:text-white transition-all"
+                                        onClick={() => handleDelete(item.id)}
+                                    >
+                                        Excluir
                                     </Button>
                                 </div>
                             </div>
@@ -218,56 +275,98 @@ export default function Cadastros() {
                 ))}
             </div>
 
-            {/* Modal Genérico de Cadastro */}
             <Modal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
-                title={`Novo Cadastro - ${currentEntity.label}`}
-                description={`Informe os dados abaixo para registrar um novo ${currentEntity.label.toLowerCase()} no GS PRO.`}
+                title={editingItem ? `Editar ${currentEntity.label.slice(0, -1)}` : `Novo Cadastro - ${currentEntity.label}`}
+                description={`Informe os dados abaixo para registrar ou atualizar um ${currentEntity.label.toLowerCase()} no GS PRO.`}
                 footer={
                     <>
                         <Button variant="outline" onClick={() => setIsModalOpen(false)} className="border-gray-800 px-8 text-gray-400">
                             Cancelar
                         </Button>
-                        <Button className="bg-brand-red text-white px-10 font-bold hover:bg-brand-red/90 uppercase tracking-widest">
+                        <Button
+                            onClick={handleSave}
+                            disabled={saving}
+                            className="bg-brand-red text-white px-10 font-bold hover:bg-brand-red/90 uppercase tracking-widest"
+                        >
+                            {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
                             Salvar Registro
                         </Button>
                     </>
                 }
             >
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Nome Completo / Razão</label>
-                        <Input className="bg-brand-darker border-gray-800 h-12 focus:border-brand-yellow/50 transition-all font-medium" placeholder="Ex: Metalúrgica Central" />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Documento (CPF/CNPJ)</label>
-                        <Input className="bg-brand-darker border-gray-800 h-12 focus:border-brand-yellow/50 transition-all font-medium font-mono" placeholder="00.000.000/0000-00" />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Email de Contato</label>
-                        <Input className="bg-brand-darker border-gray-800 h-12 focus:border-brand-yellow/50 transition-all font-medium" placeholder="nome@empresa.com" />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Telefone / WhatsApp</label>
-                        <Input className="bg-brand-darker border-gray-800 h-12 focus:border-brand-yellow/50 transition-all font-medium" placeholder="(00) 00000-0000" />
-                    </div>
-                    <div className="md:col-span-2 space-y-2">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Endereço Completo</label>
-                        <Input className="bg-brand-darker border-gray-800 h-12 focus:border-brand-yellow/50 transition-all font-medium" placeholder="Rua, Número, Bairro, Cidade - UF" />
-                    </div>
-                    {currentEntity.id === 'sucatas' || currentEntity.id === 'pecas' ? (
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Preço Sugerido (R$)</label>
-                            <Input className="bg-brand-darker border-gray-800 h-12 focus:border-brand-yellow/50 transition-all font-medium font-mono" placeholder="0,00" />
-                        </div>
-                    ) : null}
-                    {currentEntity.id === 'vendedores' ? (
-                        <div className="space-y-2">
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Comissão (%)</label>
-                            <Input className="bg-brand-darker border-gray-800 h-12 focus:border-brand-yellow/50 transition-all font-medium font-mono" placeholder="5" />
-                        </div>
-                    ) : null}
+                    {currentEntity.id === 'categorias' ? (
+                        <>
+                            <div className="space-y-2 col-span-2">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Nome da Categoria</label>
+                                <Input
+                                    value={formData.nome || ""}
+                                    onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+                                    className="bg-brand-darker border-gray-800 h-12 focus:border-brand-yellow/50 transition-all font-medium"
+                                    placeholder="Ex: Alumínio, Motores, etc."
+                                />
+                            </div>
+                            <div className="space-y-2 col-span-2">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Descrição</label>
+                                <Input
+                                    value={formData.descricao || ""}
+                                    onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
+                                    className="bg-brand-darker border-gray-800 h-12 focus:border-brand-yellow/50 transition-all font-medium"
+                                    placeholder="Breve descrição da categoria"
+                                />
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Nome Completo / Razão</label>
+                                <Input
+                                    value={formData.nome || ""}
+                                    onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+                                    className="bg-brand-darker border-gray-800 h-12 focus:border-brand-yellow/50 transition-all font-medium"
+                                    placeholder="Ex: Metalúrgica Central"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Documento (CPF/CNPJ)</label>
+                                <Input
+                                    value={formData.documento || ""}
+                                    onChange={(e) => setFormData({ ...formData, documento: e.target.value })}
+                                    className="bg-brand-darker border-gray-800 h-12 focus:border-brand-yellow/50 transition-all font-medium font-mono"
+                                    placeholder="00.000.000/0000-00"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Email de Contato</label>
+                                <Input
+                                    value={formData.email || ""}
+                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                                    className="bg-brand-darker border-gray-800 h-12 focus:border-brand-yellow/50 transition-all font-medium"
+                                    placeholder="nome@empresa.com"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Telefone / WhatsApp</label>
+                                <Input
+                                    value={formData.telefone || ""}
+                                    onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
+                                    className="bg-brand-darker border-gray-800 h-12 focus:border-brand-yellow/50 transition-all font-medium"
+                                    placeholder="(00) 00000-0000"
+                                />
+                            </div>
+                            <div className="md:col-span-2 space-y-2">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Endereço Completo</label>
+                                <Input
+                                    value={formData.endereco || ""}
+                                    onChange={(e) => setFormData({ ...formData, endereco: e.target.value })}
+                                    className="bg-brand-darker border-gray-800 h-12 focus:border-brand-yellow/50 transition-all font-medium"
+                                    placeholder="Rua, Número, Bairro, Cidade - UF"
+                                />
+                            </div>
+                        </>
+                    )}
                 </div>
             </Modal>
         </div>
