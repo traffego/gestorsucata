@@ -4,6 +4,8 @@ import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 export default function Financeiro() {
     const [loading, setLoading] = useState(true);
@@ -86,6 +88,77 @@ export default function Financeiro() {
             setLoading(false);
         }
     }
+
+    const handleGeneratePDF = () => {
+        const doc = new jsPDF();
+        const timestamp = new Date().toLocaleString('pt-BR');
+
+        // Header
+        doc.setFillColor(26, 26, 26); // Brand Dark
+        doc.rect(0, 0, 210, 40, 'F');
+
+        doc.setTextColor(255, 215, 0); // Brand Yellow
+        doc.setFontSize(24);
+        doc.setFont("helvetica", "bold");
+        doc.text("GS PRO SYSTEM", 15, 25);
+
+        doc.setTextColor(255, 255, 255);
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.text("RELATÓRIO FINANCEIRO CONSOLIDADO", 15, 32);
+        doc.text(`Gerado em: ${timestamp}`, 140, 32);
+
+        // Summary Section
+        doc.setTextColor(26, 26, 26);
+        doc.setFontSize(14);
+        doc.setFont("helvetica", "bold");
+        doc.text("Resumo Financeiro", 15, 55);
+
+        autoTable(doc, {
+            startY: 60,
+            head: [['Descrição', 'Valor']],
+            body: [
+                ['Saldo Total', resumo.saldo.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })],
+                ['Total Entradas', resumo.entradas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })],
+                ['Total Saídas', resumo.saidas.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })],
+                ['Lucro Líquido', resumo.lucro.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })]
+            ],
+            theme: 'striped',
+            headStyles: { fillColor: [255, 215, 0], textColor: [26, 26, 26] },
+        });
+
+        // Transactions Table
+        doc.setFontSize(14);
+        doc.setFont("helvetica", "bold");
+        doc.text("Últimas Transações", 15, (doc as any).lastAutoTable.finalY + 15);
+
+        const tableRows = transacoes.map(t => [
+            t.desc,
+            t.data,
+            t.forma,
+            t.tipo === 'entrada' ? 'Entrada' : 'Saída',
+            Math.abs(t.valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+        ]);
+
+        autoTable(doc, {
+            startY: (doc as any).lastAutoTable.finalY + 20,
+            head: [['Descrição', 'Data', 'Forma', 'Tipo', 'Valor']],
+            body: tableRows,
+            headStyles: { fillColor: [26, 26, 26], textColor: [255, 255, 255] },
+            alternateRowStyles: { fillColor: [245, 245, 245] },
+        });
+
+        // Footer
+        const pageCount = (doc as any).internal.getNumberOfPages();
+        for (let i = 1; i <= pageCount; i++) {
+            doc.setPage(i);
+            doc.setFontSize(8);
+            doc.setTextColor(150);
+            doc.text(`Página ${i} de ${pageCount} - GS PRO Digital Management`, 105, 285, { align: 'center' });
+        }
+
+        doc.save(`Relatorio_Financeiro_${new Date().toISOString().split('T')[0]}.pdf`);
+    };
 
     if (loading) {
         return (
@@ -197,7 +270,10 @@ export default function Financeiro() {
                                 </div>
                             </div>
 
-                            <Button className="w-full h-12 bg-brand-yellow text-brand-dark font-black hover:bg-brand-yellow/80 uppercase tracking-tighter italic">
+                            <Button
+                                onClick={handleGeneratePDF}
+                                className="w-full h-12 bg-brand-yellow text-brand-dark font-black hover:bg-brand-yellow/80 uppercase tracking-tighter italic"
+                            >
                                 Gerar Relatório PDF
                             </Button>
                             <p className="text-[10px] text-gray-600 text-center italic">Relatórios consolidados pelo GS PRO System.</p>
