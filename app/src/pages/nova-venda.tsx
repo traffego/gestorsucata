@@ -14,9 +14,16 @@ interface Product {
     stock: string;
 }
 
+interface Client {
+    id: string;
+    nome: string;
+}
+
 export default function NovaVenda() {
     const { user } = useAuth();
     const [products, setProducts] = useState<Product[]>([]);
+    const [clients, setClients] = useState<Client[]>([]);
+    const [selectedClientId, setSelectedClientId] = useState<string>("");
     const [loadingProducts, setLoadingProducts] = useState(true);
     const [cart, setCart] = useState<{ product: Product; quantity: number }[]>([]);
     const [searchTerm, setSearchTerm] = useState("");
@@ -44,7 +51,22 @@ export default function NovaVenda() {
             }
             setLoadingProducts(false);
         }
+
+        async function fetchClients() {
+            const { data, error } = await supabase
+                .from('clientes')
+                .select('id, nome')
+                .order('nome');
+
+            if (error) {
+                console.error('Erro ao buscar clientes:', error);
+            } else if (data) {
+                setClients(data);
+            }
+        }
+
         fetchProducts();
+        fetchClients();
     }, []);
 
     const addToCart = (product: Product) => {
@@ -80,6 +102,10 @@ export default function NovaVenda() {
             alert('Adicione pelo menos um item ao carrinho.');
             return;
         }
+        if (!selectedClientId) {
+            alert('Selecione um cliente para realizar a venda.');
+            return;
+        }
         if (!paymentMethod) {
             alert('Selecione uma forma de pagamento.');
             return;
@@ -95,7 +121,8 @@ export default function NovaVenda() {
                     valor_total: total,
                     forma_pagamento: paymentMethod,
                     status: 'concluida',
-                    usuario_id: user?.id // Registrar o vendedor
+                    usuario_id: user?.id, // Registrar o vendedor
+                    cliente_id: selectedClientId
                 }])
                 .select()
                 .single();
@@ -126,6 +153,7 @@ export default function NovaVenda() {
 
             setCart([]);
             setPaymentMethod(null);
+            setSelectedClientId("");
         } catch (error: any) {
             console.error('Erro ao salvar venda:', error);
             alert(`Erro ao finalizar venda: ${error.message || 'Erro desconhecido'}\n\nVerifique se o Supabase está configurado corretamente.`);
@@ -202,6 +230,27 @@ export default function NovaVenda() {
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-6">
+                        {/* Seleção de Cliente */}
+                        <div className="space-y-2 border-b border-gray-800 pb-6">
+                            <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                                <User className="h-3 w-3" /> Selecionar Cliente
+                            </label>
+                            <select
+                                value={selectedClientId}
+                                onChange={(e) => setSelectedClientId(e.target.value)}
+                                className="w-full bg-brand-darker border border-gray-800 rounded-lg h-11 px-4 text-sm text-gray-300 focus:border-brand-yellow/50 outline-none transition-all appearance-none cursor-pointer"
+                            >
+                                <option value="">Escolha um cliente...</option>
+                                {clients.map(client => (
+                                    <option key={client.id} value={client.id}>
+                                        {client.nome}
+                                    </option>
+                                ))}
+                            </select>
+                            {clients.length === 0 && (
+                                <p className="text-[10px] text-brand-red italic mt-1 font-medium">Nenhum cliente cadastrado. Cadastre um cliente primeiro.</p>
+                            )}
+                        </div>
                         <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                             {cart.length === 0 ? (
                                 <p className="text-center text-gray-500 py-8 italic text-sm">O carrinho está vazio</p>
