@@ -3,6 +3,7 @@ import { Search, ShoppingCart, Trash2, Plus, Minus, CreditCard, Banknote, QrCode
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Modal } from "@/components/ui/modal";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -24,6 +25,9 @@ export default function NovaVenda() {
     const [products, setProducts] = useState<Product[]>([]);
     const [clients, setClients] = useState<Client[]>([]);
     const [selectedClientId, setSelectedClientId] = useState<string>("");
+    const [isClientModalOpen, setIsClientModalOpen] = useState(false);
+    const [quickClientFormData, setQuickClientFormData] = useState({ nome: "", documento: "", telefone: "" });
+    const [savingClient, setSavingClient] = useState(false);
     const [loadingProducts, setLoadingProducts] = useState(true);
     const [cart, setCart] = useState<{ product: Product; quantity: number }[]>([]);
     const [searchTerm, setSearchTerm] = useState("");
@@ -93,6 +97,35 @@ export default function NovaVenda() {
             }
             return item;
         }));
+    };
+
+    const handleQuickClientSave = async () => {
+        if (!quickClientFormData.nome) {
+            alert("O nome do cliente é obrigatório.");
+            return;
+        }
+
+        setSavingClient(true);
+        try {
+            const { data, error } = await supabase
+                .from('clientes')
+                .insert([quickClientFormData])
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            // Atualizar lista e selecionar automaticamente
+            await fetchClients();
+            setSelectedClientId(data.id);
+            setIsClientModalOpen(false);
+            setQuickClientFormData({ nome: "", documento: "", telefone: "" });
+        } catch (error: any) {
+            console.error('Erro ao cadastrar cliente rápido:', error);
+            alert(`Erro ao cadastrar cliente: ${error.message}`);
+        } finally {
+            setSavingClient(false);
+        }
     };
 
     const total = cart.reduce((acc, item) => acc + (item.product.price * item.quantity), 0);
@@ -232,9 +265,19 @@ export default function NovaVenda() {
                     <CardContent className="space-y-6">
                         {/* Seleção de Cliente */}
                         <div className="space-y-2 border-b border-gray-800 pb-6">
-                            <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest flex items-center gap-2">
-                                <User className="h-3 w-3" /> Selecionar Cliente
-                            </label>
+                            <div className="flex items-center justify-between mb-2">
+                                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                                    <User className="h-3 w-3" /> Selecionar Cliente
+                                </label>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setIsClientModalOpen(true)}
+                                    className="h-6 text-[10px] bg-brand-red/10 text-brand-red hover:bg-brand-red hover:text-white px-2 uppercase font-bold tracking-widest"
+                                >
+                                    <Plus className="h-3 w-3 mr-1" /> Novo
+                                </Button>
+                            </div>
                             <select
                                 value={selectedClientId}
                                 onChange={(e) => setSelectedClientId(e.target.value)}
@@ -343,6 +386,61 @@ export default function NovaVenda() {
                     </CardContent>
                 </Card>
             </div>
+
+            {/* Modal de Cadastro Rápido de Cliente */}
+            <Modal
+                isOpen={isClientModalOpen}
+                onClose={() => setIsClientModalOpen(false)}
+                title="Novo Cliente - Cadastro Rápido"
+                description="Preencha os dados básicos para identificar o cliente nesta venda."
+                footer={
+                    <>
+                        <Button variant="outline" onClick={() => setIsClientModalOpen(false)} className="border-gray-800">
+                            Cancelar
+                        </Button>
+                        <Button
+                            onClick={handleQuickClientSave}
+                            disabled={savingClient}
+                            className="bg-brand-red text-white hover:bg-brand-red/90"
+                        >
+                            {savingClient ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                            Salvar e Selecionar
+                        </Button>
+                    </>
+                }
+            >
+                <div className="space-y-4">
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Nome Completo</label>
+                        <Input
+                            value={quickClientFormData.nome}
+                            onChange={(e) => setQuickClientFormData({ ...quickClientFormData, nome: e.target.value })}
+                            placeholder="Ex: João da Silva"
+                            className="bg-brand-darker border-gray-800"
+                        />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">CPF/CNPJ</label>
+                            <Input
+                                value={quickClientFormData.documento}
+                                onChange={(e) => setQuickClientFormData({ ...quickClientFormData, documento: e.target.value })}
+                                placeholder="000.000.000-00"
+                                className="bg-brand-darker border-gray-800"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Telefone</label>
+                            <Input
+                                value={quickClientFormData.telefone}
+                                onChange={(e) => setQuickClientFormData({ ...quickClientFormData, telefone: e.target.value })}
+                                placeholder="(00) 00000-0000"
+                                className="bg-brand-darker border-gray-800"
+                            />
+                        </div>
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 }
