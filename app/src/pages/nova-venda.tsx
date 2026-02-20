@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search, ShoppingCart, Trash2, Plus, Minus, CreditCard, Banknote, QrCode, Loader2, User } from "lucide-react";
+import { Search, ShoppingCart, Trash2, Plus, Minus, CreditCard, Banknote, Zap, Loader2, User } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -364,7 +364,7 @@ export default function NovaVenda() {
                                     className={`border-gray-700 gap-2 col-span-2 ${paymentMethod === 'pix' ? 'bg-brand-yellow text-black border-brand-yellow' : 'bg-transparent hover:bg-white/5'}`}
                                     onClick={() => setPaymentMethod('pix')}
                                 >
-                                    <QrCode className="h-4 w-4" /> PIX
+                                    <Zap className="h-4 w-4" /> PIX
                                 </Button>
                             </div>
 

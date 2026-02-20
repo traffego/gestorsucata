@@ -6,7 +6,6 @@ import Dashboard from './pages/dashboard';
 import NovaVenda from './pages/nova-venda';
 import Estoque from './pages/estoque';
 import Financeiro from './pages/financeiro';
-import QRCodeModule from './pages/qrcode';
 import Cadastros from './pages/cadastros';
 import Vendas from './pages/vendas';
 import Login from './pages/login';
@@ -41,7 +40,6 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
           <NavButton to="/vendas" label="Minhas Vendas" />
           <NavButton to="/estoque" label="Estoque" />
           <NavButton to="/financeiro" label="Financeiro" />
-          <NavButton to="/qrcode" label="QR Code" />
           <NavButton to="/cadastros" label="Cadastros" />
         </div>
         <div className="relative">
@@ -64,7 +62,6 @@ function AppContent() {
       <Route path="/vendas" element={<ProtectedLayout><div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><Vendas /></div></ProtectedLayout>} />
       <Route path="/estoque" element={<ProtectedLayout><div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><Estoque /></div></ProtectedLayout>} />
       <Route path="/financeiro" element={<ProtectedLayout><div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><Financeiro /></div></ProtectedLayout>} />
-      <Route path="/qrcode" element={<ProtectedLayout><div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><QRCodeModule /></div></ProtectedLayout>} />
       <Route path="/cadastros" element={<ProtectedLayout><div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><Cadastros /></div></ProtectedLayout>} />
       <Route path="/cadastros/:type" element={<ProtectedLayout><div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><Cadastros /></div></ProtectedLayout>} />
     </Routes>

@@ -17,8 +17,7 @@ CREATE TABLE produtos (
   estoque_atual DECIMAL(10,2) DEFAULT 0,
   estoque_minimo DECIMAL(10,2),
   localizacao TEXT,
-  data_cadastro TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  qrcode_url TEXT
+  data_cadastro TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- TABELA DE CLIENTES

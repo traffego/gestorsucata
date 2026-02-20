@@ -6,7 +6,6 @@ import {
     Users,
     BarChart3,
     Settings,
-    QrCode,
     Tag,
     Truck,
     UserCheck,
@@ -25,7 +24,6 @@ export function Sidebar({ className }: SidebarProps) {
 
     const menuItems = [
         { icon: LayoutDashboard, label: "Painel", to: "/" },
-        { icon: QrCode, label: "QR Code", to: "/qrcode" },
         { icon: ShoppingCart, label: "Nova Venda", to: "/nova-venda" },
         { icon: History, label: "Minhas Vendas", to: "/vendas" },
         {
