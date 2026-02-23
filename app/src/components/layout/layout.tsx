@@ -20,7 +20,7 @@ export function Layout({ children }: LayoutProps) {
         <div className="flex flex-col h-screen bg-brand-darker text-white">
             <header className="h-16 border-b flex items-center justify-between px-8 bg-brand-dark shrink-0">
                 <div className="flex items-center gap-4">
-                    <h1 className="text-xl font-black italic tracking-tighter uppercase text-brand-yellow">Gestor Sucata</h1>
+                    <img src="/gs-logo.png" alt="Gestor Sucata" className="h-10" />
                 </div>
                 <div className="flex items-center gap-3">
                     <div className="flex flex-col items-end">
