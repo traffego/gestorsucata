@@ -21,7 +21,7 @@ type StoreFinancials = {
 };
 
 export default function Dashboard() {
-    const { lojaAtual, isSuperAdmin, lojas: contextLojas } = useStore();
+    const { lojaAtual, isSuperAdmin } = useStore();
 
     // Store filter (superadmin only)
     const [allLojas, setAllLojas] = useState<Loja[]>([]);
