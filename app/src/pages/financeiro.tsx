@@ -35,6 +35,12 @@ export default function Financeiro() {
                 .from('vendas')
                 .select('valor_total, data_venda, forma_pagamento');
 
+            // 3. Fetch Contas a Pagar (Saídas)
+            const { data: contas } = await supabase
+                .from('contas_a_pagar')
+                .select('valor, descricao, pago_em, categoria')
+                .eq('status', 'pago');
+
             let totalEntradas = 0;
             let totalSaidas = 0;
 
@@ -66,7 +72,20 @@ export default function Financeiro() {
                 };
             });
 
-            const allTrans = [...mappedVendas, ...mappedTrans]
+            const mappedContas = (contas || []).map((c, i) => {
+                const valor = Number(c.valor || 0);
+                totalSaidas += valor;
+                return {
+                    id: `conta-${i}`,
+                    desc: c.descricao || c.categoria || 'Conta a Pagar',
+                    valor: -valor,
+                    tipo: 'saida',
+                    data: c.pago_em ? new Date(c.pago_em).toLocaleDateString('pt-BR') : '--/--/----',
+                    forma: 'Conta'
+                };
+            });
+
+            const allTrans = [...mappedVendas, ...mappedTrans, ...mappedContas]
                 .sort((a, b) => {
                     const dateA = a.data.split('/').reverse().join('-');
                     const dateB = b.data.split('/').reverse().join('-');
