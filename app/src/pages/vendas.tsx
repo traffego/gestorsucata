@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabase";
+import { useStore } from "@/contexts/StoreContext";
 
 interface SaleItem {
     id: string;
@@ -29,19 +30,20 @@ interface Sale {
 }
 
 export default function Vendas() {
+    const { lojaAtual } = useStore();
     const [sales, setSales] = useState<Sale[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
     const [expandedSaleId, setExpandedSaleId] = useState<string | null>(null);
 
     useEffect(() => {
-        fetchSales();
-    }, []);
+        if (lojaAtual) fetchSales();
+    }, [lojaAtual]);
 
     async function fetchSales() {
         setLoading(true);
         try {
-            const { data, error } = await supabase
+            const query = supabase
                 .from('vendas')
                 .select(`
                     *,
@@ -52,6 +54,10 @@ export default function Vendas() {
                     cliente:clientes (nome)
                 `)
                 .order('data_venda', { ascending: false });
+
+            if (lojaAtual) query.eq('loja_id', lojaAtual.id);
+
+            const { data, error } = await query;
 
             if (error) {
                 console.error('Erro ao buscar vendas:', error);

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
+import { useStore } from "@/contexts/StoreContext";
 
 type Conta = {
     id: string;
@@ -29,6 +30,7 @@ const CATEGORIAS = [
 ];
 
 export default function ContasAPagar() {
+    const { lojaAtual } = useStore();
     const [contas, setContas] = useState<Conta[]>([]);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -42,14 +44,16 @@ export default function ContasAPagar() {
         categoria: ""
     });
 
-    useEffect(() => { fetchContas(); }, []);
+    useEffect(() => { if (lojaAtual) fetchContas(); }, [lojaAtual]);
 
     async function fetchContas() {
         setLoading(true);
-        const { data, error } = await supabase
+        const query = supabase
             .from('contas_a_pagar')
             .select('*')
             .order('vencimento', { ascending: true });
+        if (lojaAtual) query.eq('loja_id', lojaAtual.id);
+        const { data, error } = await query;
         if (!error && data) setContas(data as Conta[]);
         setLoading(false);
     }
@@ -65,7 +69,8 @@ export default function ContasAPagar() {
             valor: parseFloat(form.valor.replace(',', '.')),
             vencimento: form.vencimento,
             categoria: form.categoria || null,
-            status: 'pendente'
+            status: 'pendente',
+            loja_id: lojaAtual?.id
         }]);
         if (error) {
             alert(`Erro: ${error.message}`);

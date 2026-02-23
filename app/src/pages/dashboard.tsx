@@ -16,9 +16,11 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
+import { useStore } from '@/contexts/StoreContext';
 import { Loader2 } from 'lucide-react';
 
 export default function Dashboard() {
+    const { lojaAtual } = useStore();
     const [recentSales, setRecentSales] = useState<any[]>([]);
     const [fluxoCaixa, setFluxoCaixa] = useState<any[]>([]);
     const [despesasPorCategoria, setDespesasPorCategoria] = useState<any[]>([]);
@@ -28,8 +30,8 @@ export default function Dashboard() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        fetchDashboardData();
-    }, []);
+        if (lojaAtual) fetchDashboardData();
+    }, [lojaAtual]);
 
     async function fetchDashboardData() {
         setLoading(true);
@@ -42,7 +44,7 @@ export default function Dashboard() {
             }
 
             // 1. Fetch Recent Sales with better error handling
-            const { data: vendas, error: salesError } = await supabase
+            const vendasQuery = supabase
                 .from('vendas')
                 .select(`
                     id,
@@ -54,6 +56,8 @@ export default function Dashboard() {
                 `)
                 .order('data_venda', { ascending: false })
                 .limit(5);
+            if (lojaAtual) vendasQuery.eq('loja_id', lojaAtual.id);
+            const { data: vendas, error: salesError } = await vendasQuery;
 
             if (salesError) {
                 console.error('Erro ao buscar vendas recentes:', salesError);
@@ -61,9 +65,10 @@ export default function Dashboard() {
 
             if (vendas) {
                 setRecentSales(vendas.map((v: any) => {
+                    const lojaNome = lojaAtual?.nome || 'Principal';
                     const vendedorNome = v.usuario_id ? userMap[v.usuario_id] : 'Sistema';
                     return {
-                        loja: 'Principal',
+                        loja: lojaNome,
                         vendedor: vendedorNome || 'Sistema',
                         data: v.data_venda ? new Date(v.data_venda).toLocaleString('pt-BR') : 'Sem data',
                         cotacao: (v.valor_total || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -75,10 +80,12 @@ export default function Dashboard() {
             const thirtyDaysAgo = new Date();
             thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-            const { data: sellerSales, error: performanceError } = await supabase
+            const sellerQuery = supabase
                 .from('vendas')
                 .select('valor_total, usuario_id')
                 .gte('data_venda', thirtyDaysAgo.toISOString());
+            if (lojaAtual) sellerQuery.eq('loja_id', lojaAtual.id);
+            const { data: sellerSales, error: performanceError } = await sellerQuery;
 
             if (performanceError) {
                 console.error('Erro ao buscar performance de vendedores:', performanceError);
@@ -123,10 +130,12 @@ export default function Dashboard() {
             // 4. Fetch Financial Data (Current Year)
             const currentYearStart = new Date(new Date().getFullYear(), 0, 1).toISOString();
 
-            const { data: allSales } = await supabase
+            const allSalesQuery = supabase
                 .from('vendas')
                 .select('data_venda, valor_total')
                 .gte('data_venda', currentYearStart);
+            if (lojaAtual) allSalesQuery.eq('loja_id', lojaAtual.id);
+            const { data: allSales } = await allSalesQuery;
 
             const { data: allExpenses } = await supabase
                 .from('transacoes')

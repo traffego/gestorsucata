@@ -5,9 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
+import { useStore } from "@/contexts/StoreContext";
 
 export default function NovaVenda() {
     const { user } = useAuth();
+    const { lojaAtual } = useStore();
 
     const [descricao, setDescricao] = useState("");
     const [preco, setPreco] = useState("");
@@ -47,7 +49,8 @@ export default function NovaVenda() {
                     tipo: 'peca',
                     preco_venda: precoNum,
                     estoque_atual: 0,
-                    unidade_medida: 'un'
+                    unidade_medida: 'un',
+                    loja_id: lojaAtual?.id
                 }])
                 .select()
                 .single();
@@ -62,6 +65,7 @@ export default function NovaVenda() {
                     forma_pagamento: paymentMethod,
                     status: 'concluida',
                     vendedor_id: user?.id,
+                    loja_id: lojaAtual?.id
                 }])
                 .select()
                 .single();

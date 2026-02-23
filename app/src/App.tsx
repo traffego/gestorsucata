@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Link, useLocation } from "react-router-dom";
 import { Layout } from './components/layout/layout';
 import { AuthProvider } from './contexts/AuthContext';
+import { StoreProvider, useStore } from './contexts/StoreContext';
 import { AuthGuard } from './components/auth/AuthGuard';
 import Dashboard from './pages/dashboard';
 import NovaVenda from './pages/nova-venda';
@@ -11,6 +12,7 @@ import Login from './pages/login';
 import ForgotPassword from './pages/forgot-password';
 import DevTools from './pages/dev-tools';
 import ContasAPagar from './pages/contas-a-pagar';
+import Admin from './pages/admin';
 
 function NavButton({ to, label, icon: Icon }: { to: string; label: string; icon?: any }) {
   const location = useLocation();
@@ -31,23 +33,56 @@ function NavButton({ to, label, icon: Icon }: { to: string; label: string; icon?
   );
 }
 
+function RoleBasedNav() {
+  const { isSuperAdmin, isVendedor, lojas, lojaAtual, setLojaAtualById } = useStore();
+
+  return (
+    <div className="mb-8 flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap gap-2 p-1.5 bg-brand-dark border border-gray-800 rounded-xl w-fit shadow-2xl">
+        {/* Vendedor vê apenas venda e histórico */}
+        {!isVendedor && <NavButton to="/" label="Painel" />}
+        <NavButton to="/nova-venda" label="Nova Venda" />
+        <NavButton to="/vendas" label="Minhas Vendas" />
+        {!isVendedor && <NavButton to="/financeiro" label="Financeiro" />}
+        {!isVendedor && <NavButton to="/cadastros" label="Cadastros" />}
+        {!isVendedor && <NavButton to="/contas-a-pagar" label="Contas a Pagar" />}
+        {isSuperAdmin && <NavButton to="/admin" label="Admin" />}
+        {isSuperAdmin && <NavButton to="/dev" label="⚙ Dev" />}
+      </div>
+
+      {/* Seletor de Loja */}
+      {lojas.length > 1 && (
+        <select
+          value={lojaAtual?.id || ''}
+          onChange={e => setLojaAtualById(e.target.value)}
+          className="ml-auto bg-brand-dark border border-gray-700 rounded-xl h-10 px-4 text-xs text-brand-yellow font-bold uppercase tracking-widest outline-none appearance-none cursor-pointer hover:border-brand-yellow/50 transition-all"
+        >
+          {lojas.map(l => (
+            <option key={l.id} value={l.id}>{l.nome}</option>
+          ))}
+        </select>
+      )}
+
+      {lojaAtual && lojas.length <= 1 && (
+        <span className="ml-auto text-[10px] text-gray-600 uppercase tracking-widest font-bold">
+          {lojaAtual.nome}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function ProtectedLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthGuard>
-      <Layout>
-        <div className="mb-8 flex flex-wrap gap-2 p-1.5 bg-brand-dark border border-gray-800 rounded-xl w-fit shadow-2xl">
-          <NavButton to="/" label="Painel" />
-          <NavButton to="/nova-venda" label="Nova Venda" />
-          <NavButton to="/vendas" label="Minhas Vendas" />
-          <NavButton to="/financeiro" label="Financeiro" />
-          <NavButton to="/cadastros" label="Cadastros" />
-          <NavButton to="/contas-a-pagar" label="Contas a Pagar" />
-          <NavButton to="/dev" label="⚙ Dev" />
-        </div>
-        <div className="relative">
-          {children}
-        </div>
-      </Layout>
+      <StoreProvider>
+        <Layout>
+          <RoleBasedNav />
+          <div className="relative">
+            {children}
+          </div>
+        </Layout>
+      </StoreProvider>
     </AuthGuard>
   );
 }
@@ -66,6 +101,7 @@ function AppContent() {
       <Route path="/cadastros" element={<ProtectedLayout><div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><Cadastros /></div></ProtectedLayout>} />
       <Route path="/cadastros/:type" element={<ProtectedLayout><div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><Cadastros /></div></ProtectedLayout>} />
       <Route path="/contas-a-pagar" element={<ProtectedLayout><div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><ContasAPagar /></div></ProtectedLayout>} />
+      <Route path="/admin" element={<ProtectedLayout><div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><Admin /></div></ProtectedLayout>} />
       <Route path="/dev" element={<ProtectedLayout><div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><DevTools /></div></ProtectedLayout>} />
     </Routes>
   );

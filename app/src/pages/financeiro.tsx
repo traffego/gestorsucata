@@ -4,10 +4,12 @@ import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
+import { useStore } from "@/contexts/StoreContext";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
 export default function Financeiro() {
+    const { lojaAtual } = useStore();
     const [loading, setLoading] = useState(true);
     const [transacoes, setTransacoes] = useState<any[]>([]);
     const [resumo, setResumo] = useState({
@@ -18,28 +20,33 @@ export default function Financeiro() {
     });
 
     useEffect(() => {
-        fetchFinanceiro();
-    }, []);
+        if (lojaAtual) fetchFinanceiro();
+    }, [lojaAtual]);
 
     async function fetchFinanceiro() {
         setLoading(true);
         try {
             // 1. Fetch Transações (Saídas e Entradas extras)
-            const { data: trans } = await supabase
+            const transQuery = supabase
                 .from('transacoes')
                 .select('*')
                 .order('data_transacao', { ascending: false });
+            const { data: trans } = await transQuery;
 
             // 2. Fetch Vendas (Entradas principais)
-            const { data: vendas } = await supabase
+            const vendasQuery = supabase
                 .from('vendas')
                 .select('valor_total, data_venda, forma_pagamento');
+            if (lojaAtual) vendasQuery.eq('loja_id', lojaAtual.id);
+            const { data: vendas } = await vendasQuery;
 
             // 3. Fetch Contas a Pagar (Saídas)
-            const { data: contas } = await supabase
+            const contasQuery = supabase
                 .from('contas_a_pagar')
                 .select('valor, descricao, pago_em, categoria')
                 .eq('status', 'pago');
+            if (lojaAtual) contasQuery.eq('loja_id', lojaAtual.id);
+            const { data: contas } = await contasQuery;
 
             let totalEntradas = 0;
             let totalSaidas = 0;

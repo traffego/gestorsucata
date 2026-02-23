@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
+import { useStore } from "@/contexts/StoreContext";
 
 type EntityType = 'clientes' | 'localizacoes' | 'transportadoras' | 'vendedores' | 'fornecedores';
 
@@ -32,6 +33,7 @@ const ENTITIES: EntityConfig[] = [
 export default function Cadastros() {
     const { type } = useParams();
     const navigate = useNavigate();
+    const { lojaAtual } = useStore();
     const [activeEntity, setActiveEntity] = useState<EntityType>((type as EntityType) || 'clientes');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
@@ -48,8 +50,8 @@ export default function Cadastros() {
     }, [type]);
 
     useEffect(() => {
-        fetchEntityData();
-    }, [activeEntity]);
+        if (lojaAtual) fetchEntityData();
+    }, [activeEntity, lojaAtual]);
 
     const handleEntityChange = (id: EntityType) => {
         setActiveEntity(id);
@@ -67,9 +69,14 @@ export default function Cadastros() {
                     .eq('id', editingItem.id);
                 if (error) throw error;
             } else {
+                const insertData = { ...formData };
+                // clientes e fornecedores recebem loja_id
+                if (['clientes', 'fornecedores'].includes(activeEntity) && lojaAtual) {
+                    insertData.loja_id = lojaAtual.id;
+                }
                 const { error } = await supabase
                     .from(config.table)
-                    .insert([formData]);
+                    .insert([insertData]);
                 if (error) throw error;
             }
             await fetchEntityData();
@@ -114,7 +121,12 @@ export default function Cadastros() {
                 return;
             }
 
-            const { data: result, error } = await supabase.from(config.table).select('*');
+            const query = supabase.from(config.table).select('*');
+            // Filtrar por loja para clientes
+            if (['clientes'].includes(activeEntity) && lojaAtual) {
+                query.eq('loja_id', lojaAtual.id);
+            }
+            const { data: result, error } = await query;
             if (error) {
                 console.error(`Error fetching ${activeEntity}:`, error);
                 setData([]);
