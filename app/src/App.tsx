@@ -9,6 +9,7 @@ import Cadastros from './pages/cadastros';
 import Vendas from './pages/vendas';
 import Login from './pages/login';
 import ForgotPassword from './pages/forgot-password';
+import DevTools from './pages/dev-tools';
 
 function NavButton({ to, label, icon: Icon }: { to: string; label: string; icon?: any }) {
   const location = useLocation();
@@ -39,6 +40,7 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
           <NavButton to="/vendas" label="Minhas Vendas" />
           <NavButton to="/financeiro" label="Financeiro" />
           <NavButton to="/cadastros" label="Cadastros" />
+          <NavButton to="/dev" label="⚙ Dev" />
         </div>
         <div className="relative">
           {children}
@@ -61,6 +63,7 @@ function AppContent() {
       <Route path="/financeiro" element={<ProtectedLayout><div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><Financeiro /></div></ProtectedLayout>} />
       <Route path="/cadastros" element={<ProtectedLayout><div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><Cadastros /></div></ProtectedLayout>} />
       <Route path="/cadastros/:type" element={<ProtectedLayout><div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><Cadastros /></div></ProtectedLayout>} />
+      <Route path="/dev" element={<ProtectedLayout><div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><DevTools /></div></ProtectedLayout>} />
     </Routes>
   );
 }
