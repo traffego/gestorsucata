@@ -6,13 +6,13 @@ import { AuthGuard } from './components/auth/AuthGuard';
 import Dashboard from './pages/dashboard';
 import NovaVenda from './pages/nova-venda';
 import Financeiro from './pages/financeiro';
-import Cadastros from './pages/cadastros';
 import Vendas from './pages/vendas';
 import Login from './pages/login';
 import ForgotPassword from './pages/forgot-password';
 import DevTools from './pages/dev-tools';
 import ContasAPagar from './pages/contas-a-pagar';
-import Admin from './pages/admin';
+import Lojas from './pages/lojas';
+import Usuarios from './pages/usuarios';
 
 function NavButton({ to, label, icon: Icon }: { to: string; label: string; icon?: any }) {
   const location = useLocation();
@@ -44,9 +44,9 @@ function RoleBasedNav() {
         <NavButton to="/nova-venda" label="Nova Venda" />
         <NavButton to="/vendas" label="Minhas Vendas" />
         {!isVendedor && <NavButton to="/financeiro" label="Financeiro" />}
-        {!isVendedor && <NavButton to="/cadastros" label="Cadastros" />}
+        {!isVendedor && <NavButton to="/lojas" label="Lojas" />}
+        {!isVendedor && <NavButton to="/usuarios" label="Usuários" />}
         {!isVendedor && <NavButton to="/contas-a-pagar" label="Contas a Pagar" />}
-        {isSuperAdmin && <NavButton to="/admin" label="Admin" />}
         {isSuperAdmin && <NavButton to="/dev" label="⚙ Dev" />}
       </div>
 
@@ -98,10 +98,9 @@ function AppContent() {
       <Route path="/nova-venda" element={<ProtectedLayout><div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><NovaVenda /></div></ProtectedLayout>} />
       <Route path="/vendas" element={<ProtectedLayout><div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><Vendas /></div></ProtectedLayout>} />
       <Route path="/financeiro" element={<ProtectedLayout><div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><Financeiro /></div></ProtectedLayout>} />
-      <Route path="/cadastros" element={<ProtectedLayout><div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><Cadastros /></div></ProtectedLayout>} />
-      <Route path="/cadastros/:type" element={<ProtectedLayout><div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><Cadastros /></div></ProtectedLayout>} />
+      <Route path="/lojas" element={<ProtectedLayout><div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><Lojas /></div></ProtectedLayout>} />
+      <Route path="/usuarios" element={<ProtectedLayout><div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><Usuarios /></div></ProtectedLayout>} />
       <Route path="/contas-a-pagar" element={<ProtectedLayout><div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><ContasAPagar /></div></ProtectedLayout>} />
-      <Route path="/admin" element={<ProtectedLayout><div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><Admin /></div></ProtectedLayout>} />
       <Route path="/dev" element={<ProtectedLayout><div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><DevTools /></div></ProtectedLayout>} />
     </Routes>
   );
