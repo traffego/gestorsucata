@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
     Plus, Search, MoreHorizontal,
-    Factory, Tag, Package, Users, Truck, UserCheck, MapPin, Loader2
+    Users, Truck, UserCheck, MapPin, Loader2, Factory
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { Modal } from "@/components/ui/modal";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 
-type EntityType = 'sucatas' | 'pecas' | 'categorias' | 'clientes' | 'localizacoes' | 'transportadoras' | 'vendedores' | 'fornecedores';
+type EntityType = 'clientes' | 'localizacoes' | 'transportadoras' | 'vendedores' | 'fornecedores';
 
 interface EntityConfig {
     id: EntityType;
@@ -22,9 +22,6 @@ interface EntityConfig {
 }
 
 const ENTITIES: EntityConfig[] = [
-    { id: 'sucatas', label: 'Sucatas', icon: Factory, color: 'text-brand-red', table: 'produtos' },
-    { id: 'pecas', label: 'Peças', icon: Tag, color: 'text-brand-yellow', table: 'produtos' },
-    { id: 'categorias', label: 'Categorias', icon: Package, color: 'text-blue-500', table: 'categorias' },
     { id: 'clientes', label: 'Clientes', icon: Users, color: 'text-green-500', table: 'clientes' },
     { id: 'localizacoes', label: 'Localizações', icon: MapPin, color: 'text-purple-500', table: 'produtos' },
     { id: 'transportadoras', label: 'Transportadoras', icon: Truck, color: 'text-orange-500', table: 'transportadoras' },
@@ -109,13 +106,7 @@ export default function Cadastros() {
         const config = ENTITIES.find(e => e.id === activeEntity)!;
 
         try {
-            let query = supabase.from(config.table).select('*');
-
-            if (activeEntity === 'sucatas') {
-                query = query.eq('tipo', 'sucata');
-            } else if (activeEntity === 'pecas') {
-                query = query.eq('tipo', 'peca');
-            } else if (activeEntity === 'localizacoes') {
+            if (activeEntity === 'localizacoes') {
                 const { data: prods } = await supabase.from('produtos').select('localizacao');
                 const uniqueLocs = Array.from(new Set(prods?.map(p => p.localizacao).filter(Boolean)));
                 setData(uniqueLocs.map((name, i) => ({ id: i, nome: name, info: 'Local de Armazenamento' })));
@@ -123,7 +114,7 @@ export default function Cadastros() {
                 return;
             }
 
-            const { data: result, error } = await query;
+            const { data: result, error } = await supabase.from(config.table).select('*');
             if (error) {
                 console.error(`Error fetching ${activeEntity}:`, error);
                 setData([]);
@@ -237,11 +228,10 @@ export default function Cadastros() {
                                         <div className="space-y-1">
                                             <span className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">
                                                 {activeEntity === 'clientes' ? 'Documento' :
-                                                    activeEntity === 'vendedores' ? 'Cargo' :
-                                                        (activeEntity === 'sucatas' || activeEntity === 'pecas') ? 'SKU' : 'Info'}
+                                                    activeEntity === 'vendedores' ? 'Cargo' : 'Info'}
                                             </span>
                                             <p className="text-sm text-gray-300">
-                                                {item.documento || item.role || item.sku || item.info || 'N/A'}
+                                                {item.documento || item.role || item.info || 'N/A'}
                                             </p>
                                         </div>
                                         <div className="space-y-1">
@@ -311,76 +301,24 @@ export default function Cadastros() {
                 }
             >
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {currentEntity.id === 'categorias' ? (
-                        <>
-                            <div className="space-y-2 col-span-2">
-                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Nome da Categoria</label>
-                                <Input
-                                    value={formData.nome || ""}
-                                    onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                                    className="bg-brand-darker border-gray-800 h-12 focus:border-brand-yellow/50 transition-all font-medium"
-                                    placeholder="Ex: Alumínio, Motores, etc."
-                                />
-                            </div>
-                            <div className="space-y-2 col-span-2">
-                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Descrição</label>
-                                <Input
-                                    value={formData.descricao || ""}
-                                    onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
-                                    className="bg-brand-darker border-gray-800 h-12 focus:border-brand-yellow/50 transition-all font-medium"
-                                    placeholder="Breve descrição da categoria"
-                                />
-                            </div>
-                        </>
-                    ) : (
-                        <>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Nome Completo / Razão</label>
-                                <Input
-                                    value={formData.nome || ""}
-                                    onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                                    className="bg-brand-darker border-gray-800 h-12 focus:border-brand-yellow/50 transition-all font-medium"
-                                    placeholder="Ex: Metalúrgica Central"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Documento (CPF/CNPJ)</label>
-                                <Input
-                                    value={formData.documento || ""}
-                                    onChange={(e) => setFormData({ ...formData, documento: e.target.value })}
-                                    className="bg-brand-darker border-gray-800 h-12 focus:border-brand-yellow/50 transition-all font-medium font-mono"
-                                    placeholder="00.000.000/0000-00"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Email de Contato</label>
-                                <Input
-                                    value={formData.email || ""}
-                                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                    className="bg-brand-darker border-gray-800 h-12 focus:border-brand-yellow/50 transition-all font-medium"
-                                    placeholder="nome@empresa.com"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Telefone / WhatsApp</label>
-                                <Input
-                                    value={formData.telefone || ""}
-                                    onChange={(e) => setFormData({ ...formData, telefone: e.target.value })}
-                                    className="bg-brand-darker border-gray-800 h-12 focus:border-brand-yellow/50 transition-all font-medium"
-                                    placeholder="(00) 00000-0000"
-                                />
-                            </div>
-                            <div className="md:col-span-2 space-y-2">
-                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Endereço Completo</label>
-                                <Input
-                                    value={formData.endereco || ""}
-                                    onChange={(e) => setFormData({ ...formData, endereco: e.target.value })}
-                                    className="bg-brand-darker border-gray-800 h-12 focus:border-brand-yellow/50 transition-all font-medium"
-                                    placeholder="Rua, Número, Bairro, Cidade - UF"
-                                />
-                            </div>
-                        </>
-                    )}
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Nome Completo / Razão</label>
+                        <Input
+                            value={formData.nome || ""}
+                            onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
+                            className="bg-brand-darker border-gray-800 h-12 focus:border-brand-yellow/50 transition-all font-medium"
+                            placeholder="Ex: Nome do registro"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Documento (CPF/CNPJ)</label>
+                        <Input
+                            value={formData.documento || ""}
+                            onChange={(e) => setFormData({ ...formData, documento: e.target.value })}
+                            className="bg-brand-darker border-gray-800 h-12 focus:border-brand-yellow/50 transition-all font-medium font-mono"
+                            placeholder="000.000.000-00"
+                        />
+                    </div>
                 </div>
             </Modal>
         </div>

@@ -4,7 +4,6 @@ import { AuthProvider } from './contexts/AuthContext';
 import { AuthGuard } from './components/auth/AuthGuard';
 import Dashboard from './pages/dashboard';
 import NovaVenda from './pages/nova-venda';
-import Estoque from './pages/estoque';
 import Financeiro from './pages/financeiro';
 import Cadastros from './pages/cadastros';
 import Vendas from './pages/vendas';
@@ -38,7 +37,6 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
           <NavButton to="/" label="Painel" />
           <NavButton to="/nova-venda" label="Nova Venda" />
           <NavButton to="/vendas" label="Minhas Vendas" />
-          <NavButton to="/estoque" label="Estoque" />
           <NavButton to="/financeiro" label="Financeiro" />
           <NavButton to="/cadastros" label="Cadastros" />
         </div>
@@ -60,7 +58,6 @@ function AppContent() {
       <Route path="/" element={<ProtectedLayout><div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><Dashboard /></div></ProtectedLayout>} />
       <Route path="/nova-venda" element={<ProtectedLayout><div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><NovaVenda /></div></ProtectedLayout>} />
       <Route path="/vendas" element={<ProtectedLayout><div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><Vendas /></div></ProtectedLayout>} />
-      <Route path="/estoque" element={<ProtectedLayout><div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><Estoque /></div></ProtectedLayout>} />
       <Route path="/financeiro" element={<ProtectedLayout><div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><Financeiro /></div></ProtectedLayout>} />
       <Route path="/cadastros" element={<ProtectedLayout><div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><Cadastros /></div></ProtectedLayout>} />
       <Route path="/cadastros/:type" element={<ProtectedLayout><div className="animate-in fade-in slide-in-from-bottom-4 duration-700 ease-out"><Cadastros /></div></ProtectedLayout>} />

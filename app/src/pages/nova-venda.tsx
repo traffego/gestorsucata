@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Search, ShoppingCart, Trash2, Plus, Minus, CreditCard, Banknote, Zap, Loader2, User } from "lucide-react";
+import { ShoppingCart, Trash2, Plus, Minus, CreditCard, Banknote, Zap, Loader2, User } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,13 +7,6 @@ import { Modal } from "@/components/ui/modal";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 
-interface Product {
-    id: string;
-    name: string;
-    price: number;
-    type: 'sucata' | 'peca';
-    stock: string;
-}
 
 interface Client {
     id: string;
@@ -22,38 +15,18 @@ interface Client {
 
 export default function NovaVenda() {
     const { user } = useAuth();
-    const [products, setProducts] = useState<Product[]>([]);
     const [clients, setClients] = useState<Client[]>([]);
     const [selectedClientId, setSelectedClientId] = useState<string>("");
     const [isClientModalOpen, setIsClientModalOpen] = useState(false);
     const [quickClientFormData, setQuickClientFormData] = useState({ nome: "", documento: "", telefone: "" });
     const [savingClient, setSavingClient] = useState(false);
-    const [loadingProducts, setLoadingProducts] = useState(true);
-    const [cart, setCart] = useState<{ product: Product; quantity: number }[]>([]);
-    const [searchTerm, setSearchTerm] = useState("");
+
+    // Novo estado para o item sendo adicionado manualmente
+    const [newItem, setNewItem] = useState({ name: "", price: "", quantity: "1" });
+
+    const [cart, setCart] = useState<{ product: any; quantity: number }[]>([]);
     const [paymentMethod, setPaymentMethod] = useState<'dinheiro' | 'cartao' | 'pix' | null>(null);
     const [loading, setLoading] = useState(false);
-
-    async function fetchProducts() {
-        setLoadingProducts(true);
-        const { data, error } = await supabase
-            .from('produtos')
-            .select('id, nome, preco_venda, tipo, estoque_atual, unidade_medida');
-
-        if (error) {
-            console.error('Erro ao buscar produtos:', error);
-        } else if (data) {
-            const mapped: Product[] = data.map((p: any) => ({
-                id: p.id,
-                name: p.nome,
-                price: p.preco_venda || 0,
-                type: p.tipo as 'sucata' | 'peca',
-                stock: `${p.estoque_atual || 0} ${p.unidade_medida || 'un'}`
-            }));
-            setProducts(mapped);
-        }
-        setLoadingProducts(false);
-    }
 
     async function fetchClients() {
         const { data, error } = await supabase
@@ -69,20 +42,33 @@ export default function NovaVenda() {
     }
 
     useEffect(() => {
-        fetchProducts();
         fetchClients();
     }, []);
 
-    const addToCart = (product: Product) => {
-        setCart(prev => {
-            const existing = prev.find(item => item.product.id === product.id);
-            if (existing) {
-                return prev.map(item =>
-                    item.product.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
-                );
-            }
-            return [...prev, { product, quantity: 1 }];
-        });
+    const addItemToCart = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newItem.name || !newItem.price || !newItem.quantity) {
+            alert("Preencha todos os campos do item.");
+            return;
+        }
+
+        const price = parseFloat(newItem.price.replace(',', '.'));
+        const quantity = parseFloat(newItem.quantity.replace(',', '.'));
+
+        if (isNaN(price) || isNaN(quantity)) {
+            alert("Preço ou quantidade inválidos.");
+            return;
+        }
+
+        const product = {
+            id: `temp-${Date.now()}`,
+            name: newItem.name,
+            price: price,
+            type: 'peca' as const
+        };
+
+        setCart(prev => [...prev, { product, quantity }]);
+        setNewItem({ name: "", price: "", quantity: "1" });
     };
 
     const removeFromCart = (id: string) => {
@@ -92,7 +78,7 @@ export default function NovaVenda() {
     const updateQuantity = (id: string, delta: number) => {
         setCart(prev => prev.map(item => {
             if (item.product.id === id) {
-                const newQty = Math.max(1, item.quantity + delta);
+                const newQty = Math.max(0.1, item.quantity + delta);
                 return { ...item, quantity: newQty };
             }
             return item;
@@ -154,7 +140,7 @@ export default function NovaVenda() {
                     valor_total: total,
                     forma_pagamento: paymentMethod,
                     status: 'concluida',
-                    usuario_id: user?.id, // Registrar o vendedor
+                    vendedor_id: user?.id, // Corrigido para vendedor_id conforme schema
                     cliente_id: selectedClientId
                 }])
                 .select()
@@ -162,19 +148,37 @@ export default function NovaVenda() {
 
             if (vendaError) throw vendaError;
 
-            // 2. Inserir os itens da venda
-            const itensParaInserir = cart.map(item => ({
-                venda_id: venda.id,
-                produto_id: item.product.id,
-                quantidade: item.quantity,
-                preco_unitario: item.product.price
-            }));
+            // 2. Para cada item no carrinho, vamos criar um registro em 'produtos' 
+            // e depois em 'itens_venda'.
+            for (const item of cart) {
+                const sku = `SALE-${venda.id.slice(0, 5)}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
 
-            const { error: itensError } = await supabase
-                .from('itens_venda')
-                .insert(itensParaInserir);
+                const { data: produto, error: prodError } = await supabase
+                    .from('produtos')
+                    .insert([{
+                        nome: item.product.name,
+                        sku: sku,
+                        tipo: item.product.type,
+                        preco_venda: item.product.price,
+                        estoque_atual: 0, // Venda única, estoque não é o foco aqui mas o sistema exige
+                        unidade_medida: 'un'
+                    }])
+                    .select()
+                    .single();
 
-            if (itensError) throw itensError;
+                if (prodError) throw prodError;
+
+                const { error: itemError } = await supabase
+                    .from('itens_venda')
+                    .insert([{
+                        venda_id: venda.id,
+                        produto_id: produto.id,
+                        quantidade: item.quantity,
+                        preco_unitario: item.product.price
+                    }]);
+
+                if (itemError) throw itemError;
+            }
 
             const paymentLabels = {
                 dinheiro: 'Dinheiro',
@@ -182,14 +186,14 @@ export default function NovaVenda() {
                 pix: 'PIX'
             };
 
-            alert(`Venda finalizada e salva com sucesso!\n\nTotal: R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\nForma de pagamento: ${paymentLabels[paymentMethod]}`);
+            alert(`Venda finalizada com sucesso!\n\nTotal: R$ ${total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\nForma de pagamento: ${paymentLabels[paymentMethod]}`);
 
             setCart([]);
             setPaymentMethod(null);
             setSelectedClientId("");
         } catch (error: any) {
             console.error('Erro ao salvar venda:', error);
-            alert(`Erro ao finalizar venda: ${error.message || 'Erro desconhecido'}\n\nVerifique se o Supabase está configurado corretamente.`);
+            alert(`Erro ao finalizar venda: ${error.message || 'Erro desconhecido'}`);
         } finally {
             setLoading(false);
         }
@@ -200,57 +204,50 @@ export default function NovaVenda() {
             <div className="lg:col-span-2 space-y-6">
                 <Card className="bg-brand-dark border-gray-800 text-white">
                     <CardHeader>
-                        <CardTitle>Produtos Disponíveis</CardTitle>
-                        <div className="relative mt-2">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-500" />
-                            <Input
-                                placeholder="Buscar por nome ou código..."
-                                className="pl-10 bg-brand-darker border-gray-700 text-white"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                            />
-                        </div>
+                        <CardTitle>Adicionar Itens à Venda</CardTitle>
+                        <p className="text-sm text-gray-500">Informe os detalhes do produto para esta venda específica.</p>
                     </CardHeader>
                     <CardContent>
-                        {loadingProducts ? (
-                            <div className="flex items-center justify-center py-12">
-                                <Loader2 className="h-8 w-8 animate-spin text-brand-yellow" />
-                                <span className="ml-2 text-gray-400">Carregando produtos...</span>
+                        <form onSubmit={addItemToCart} className="space-y-6">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Descrição do Produto</label>
+                                <Input
+                                    placeholder="Ex: Alumínio Batido, Motor de Geladeira, etc."
+                                    className="bg-brand-darker border-gray-800 h-12 text-white text-lg focus:border-brand-yellow/50 transition-all font-bold"
+                                    value={newItem.name}
+                                    onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
+                                />
                             </div>
-                        ) : products.length === 0 ? (
-                            <p className="text-center text-gray-500 py-8">Nenhum produto cadastrado no banco de dados.</p>
-                        ) : (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {products.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase())).map(product => (
-                                    <div
-                                        key={product.id}
-                                        className="p-4 border border-gray-800 rounded-lg hover:border-brand-yellow transition-colors bg-brand-darker/50 group"
-                                    >
-                                        <div className="flex justify-between items-start mb-2">
-                                            <div>
-                                                <h4 className="font-semibold text-gray-200">{product.name}</h4>
-                                                <span className="text-[10px] uppercase font-bold text-brand-yellow px-1.5 py-0.5 border border-brand-yellow/30 rounded">
-                                                    {product.type}
-                                                </span>
-                                            </div>
-                                            <span className="text-lg font-bold text-white">
-                                                R$ {product.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between items-center mt-4">
-                                            <span className="text-xs text-gray-500 italic">Estoque: {product.stock}</span>
-                                            <Button
-                                                size="sm"
-                                                className="bg-brand-red hover:bg-brand-red/90 text-white gap-2"
-                                                onClick={() => addToCart(product)}
-                                            >
-                                                <Plus className="h-4 w-4" /> Adicionar
-                                            </Button>
-                                        </div>
-                                    </div>
-                                ))}
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Preço Unitário (R$)</label>
+                                    <Input
+                                        placeholder="0,00"
+                                        className="bg-brand-darker border-gray-800 h-12 text-white font-mono focus:border-brand-yellow/50 transition-all"
+                                        value={newItem.price}
+                                        onChange={(e) => setNewItem({ ...newItem, price: e.target.value })}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Quantidade</label>
+                                    <Input
+                                        placeholder="1"
+                                        type="text"
+                                        className="bg-brand-darker border-gray-800 h-12 text-white font-mono focus:border-brand-yellow/50 transition-all"
+                                        value={newItem.quantity}
+                                        onChange={(e) => setNewItem({ ...newItem, quantity: e.target.value })}
+                                    />
+                                </div>
                             </div>
-                        )}
+
+                            <Button
+                                type="submit"
+                                className="w-full bg-brand-yellow text-brand-dark font-black hover:bg-brand-yellow/90 h-12 uppercase tracking-widest text-sm"
+                            >
+                                <Plus className="h-5 w-5 mr-2 stroke-[3px]" /> Adicionar ao Carrinho
+                            </Button>
+                        </form>
                     </CardContent>
                 </Card>
             </div>

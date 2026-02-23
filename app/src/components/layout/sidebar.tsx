@@ -1,7 +1,6 @@
 import {
     LayoutDashboard,
     ShoppingCart,
-    Package,
     Store,
     Users,
     BarChart3,
@@ -31,9 +30,6 @@ export function Sidebar({ className }: SidebarProps) {
             label: "Cadastros",
             to: "/cadastros", // Rota principal ou wrapper
             submenu: [
-                { icon: Factory, label: "Cadastro de Sucatas", to: "/cadastros/sucatas" },
-                { icon: Tag, label: "Cadastro de Peças", to: "/cadastros/pecas" },
-                { icon: Package, label: "Categorias de Peças", to: "/cadastros/categorias" },
                 { icon: Users, label: "Clientes", to: "/cadastros/clientes" },
                 { icon: MapPin, label: "Localizações", to: "/cadastros/localizacoes" },
                 { icon: Truck, label: "Transportadoras", to: "/cadastros/transportadoras" },
@@ -41,8 +37,6 @@ export function Sidebar({ className }: SidebarProps) {
                 { icon: Factory, label: "Fornecedores", to: "/cadastros/fornecedores" },
             ]
         },
-        { icon: Package, label: "Estoque de peças", to: "/estoque" },
-        { icon: Factory, label: "Sucatas", to: "/sucatas" }, // Ajustar rota se necessário
         { icon: Tag, label: "Etiquetas", to: "/etiquetas" }, // Ajustar rota se necessário
         { icon: Store, label: "Lojas", to: "/lojas" }, // Ajustar rota se necessário
         { icon: Users, label: "Usuários", to: "/usuarios" }, // Ajustar rota se necessário
