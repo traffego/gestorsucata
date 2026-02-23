@@ -1,26 +1,8 @@
 {
-    "buildCommand": "npm run build",
-    "outputDirectory": "dist",
-    "installCommand": "cd app && npm install && cd ../landingpage && npm install",
+    "outputDirectory": "app/dist",
     "rewrites": [
         {
-            "source": "/app/:match(.*\\..*)",
-            "destination": "/app/$1"
-        },
-        {
-            "source": "/app/:match((?!.*\\.).*)",
-            "destination": "/app/index.html"
-        },
-        {
-            "source": "/app",
-            "destination": "/app/index.html"
-        },
-        {
-            "source": "/:match(.*\\..*)",
-            "destination": "/$1"
-        },
-        {
-            "source": "/:match*",
+            "source": "/(.*)",
             "destination": "/index.html"
         }
     ]
