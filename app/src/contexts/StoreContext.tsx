@@ -62,11 +62,43 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 return;
             }
 
-            const roles = (data || []).map((d: any) => ({
+            let roles = (data || []).map((d: any) => ({
                 loja_id: d.loja_id,
                 role: d.role as Role,
                 loja: d.loja as Loja
             }));
+
+            // Auto-bootstrap: se o usuário não tem nenhum role, verifica se é o primeiro
+            // e auto-atribui como superadmin da matriz
+            if (roles.length === 0) {
+                const { data: allRoles } = await supabase
+                    .from('usuario_loja_roles')
+                    .select('id')
+                    .limit(1);
+
+                // Se ninguém tem role ainda, este é o primeiro usuário → superadmin
+                if (!allRoles || allRoles.length === 0) {
+                    const { data: matrizLoja } = await supabase
+                        .from('lojas')
+                        .select('id, nome, is_matriz')
+                        .eq('is_matriz', true)
+                        .single();
+
+                    if (matrizLoja) {
+                        await supabase.from('usuario_loja_roles').insert([{
+                            usuario_id: user!.id,
+                            loja_id: matrizLoja.id,
+                            role: 'superadmin'
+                        }]);
+
+                        roles = [{
+                            loja_id: matrizLoja.id,
+                            role: 'superadmin' as Role,
+                            loja: matrizLoja as Loja
+                        }];
+                    }
+                }
+            }
 
             setUserRoles(roles);
 
