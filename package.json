@@ -2,6 +2,6 @@
     "name": "gestorsucata-root",
     "private": true,
     "scripts": {
-        "build": "cd app && npm run build && cd ../landingpage && npm run build && cd .. && node scripts/merge-dist.js"
+        "build": "cd app && npm run build"
     }
 }
