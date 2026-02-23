@@ -38,12 +38,14 @@ export default function Admin() {
     const [roles, setRoles] = useState<UserRole[]>([]);
     const [loadingRoles, setLoadingRoles] = useState(true);
     const [isUserModalOpen, setIsUserModalOpen] = useState(false);
-    const [userForm, setUserForm] = useState({ email: '', password: '', loja_id: '', role: 'vendedor' });
+    const [existingUsers, setExistingUsers] = useState<any[]>([]);
+    const [userForm, setUserForm] = useState({ usuario_id: '', loja_id: '', role: 'vendedor' });
     const [savingUser, setSavingUser] = useState(false);
 
     useEffect(() => {
         fetchLojas();
         fetchRoles();
+        fetchExistingUsers();
     }, []);
 
     async function fetchLojas() {
@@ -84,6 +86,11 @@ export default function Admin() {
         setLoadingRoles(false);
     }
 
+    async function fetchExistingUsers() {
+        const { data } = await supabase.from('usuarios').select('id, email, nome');
+        setExistingUsers(data || []);
+    }
+
     // Refetch roles when lojas change
     useEffect(() => {
         if (lojas.length > 0) fetchRoles();
@@ -115,36 +122,16 @@ export default function Admin() {
     };
 
     const handleSaveUser = async () => {
-        if (!userForm.email || !userForm.password || !userForm.loja_id) {
-            alert('Preencha email, senha e loja.');
+        if (!userForm.usuario_id || !userForm.loja_id) {
+            alert('Selecione um usuário e uma loja.');
             return;
         }
         setSavingUser(true);
         try {
-            // 1. Criar usuário no Supabase Auth via admin invite
-            const { data: authData, error: authError } = await supabase.auth.signUp({
-                email: userForm.email,
-                password: userForm.password,
-            });
-
-            if (authError) throw authError;
-            if (!authData.user) throw new Error('Usuário não foi criado');
-
-            const userId = authData.user.id;
-
-            // 2. Criar na tabela usuarios (perfil)
-            await supabase.from('usuarios').insert([{
-                id: userId,
-                email: userForm.email,
-                nome: userForm.email.split('@')[0],
-                role: userForm.role
-            }]);
-
-            // 3. Atribuir role na loja
             const { error: roleError } = await supabase
                 .from('usuario_loja_roles')
                 .insert([{
-                    usuario_id: userId,
+                    usuario_id: userForm.usuario_id,
                     loja_id: userForm.loja_id,
                     role: userForm.role
                 }]);
@@ -152,11 +139,15 @@ export default function Admin() {
             if (roleError) throw roleError;
 
             setIsUserModalOpen(false);
-            setUserForm({ email: '', password: '', loja_id: '', role: 'vendedor' });
+            setUserForm({ usuario_id: '', loja_id: '', role: 'vendedor' });
             await fetchRoles();
-            alert('Usuário criado com sucesso!');
+            alert('Permissão atribuída com sucesso!');
         } catch (err: any) {
-            alert(`Erro: ${err.message}`);
+            if (err.message?.includes('unique') || err.message?.includes('duplicate')) {
+                alert('Este usuário já tem um vínculo com esta loja.');
+            } else {
+                alert(`Erro: ${err.message}`);
+            }
         }
         setSavingUser(false);
     };
@@ -260,7 +251,7 @@ export default function Admin() {
                             onClick={() => setIsUserModalOpen(true)}
                             className="bg-brand-yellow text-brand-dark font-black hover:bg-brand-yellow/90 uppercase tracking-widest"
                         >
-                            <UserPlus className="h-4 w-4 mr-2 stroke-[3px]" /> Criar Usuário
+                            <UserPlus className="h-4 w-4 mr-2 stroke-[3px]" /> Atribuir Permissão
                         </Button>
                     </div>
 
@@ -337,41 +328,40 @@ export default function Admin() {
                 </div>
             </Modal>
 
-            {/* Modal Criar Usuário */}
+            {/* Modal Atribuir Permissão */}
             <Modal
                 isOpen={isUserModalOpen}
                 onClose={() => setIsUserModalOpen(false)}
-                title="Criar Novo Usuário"
-                description="Crie um login e atribua uma loja e permissão."
+                title="Atribuir Permissão"
+                description="Selecione um usuário já registrado e atribua uma loja e permissão."
                 footer={
                     <>
                         <Button variant="outline" onClick={() => setIsUserModalOpen(false)} className="border-gray-800">Cancelar</Button>
                         <Button onClick={handleSaveUser} disabled={savingUser} className="bg-brand-red text-white hover:bg-brand-red/90 font-bold uppercase tracking-widest">
-                            {savingUser ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Criar Usuário
+                            {savingUser ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null} Atribuir
                         </Button>
                     </>
                 }
             >
                 <div className="space-y-4">
                     <div className="space-y-2">
-                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Email de Login</label>
-                        <Input
-                            type="email"
-                            value={userForm.email}
-                            onChange={e => setUserForm({ ...userForm, email: e.target.value })}
-                            placeholder="usuario@email.com"
-                            className="bg-brand-darker border-gray-800 h-12 focus:border-brand-yellow/50"
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Senha</label>
-                        <Input
-                            type="password"
-                            value={userForm.password}
-                            onChange={e => setUserForm({ ...userForm, password: e.target.value })}
-                            placeholder="Mínimo 6 caracteres"
-                            className="bg-brand-darker border-gray-800 h-12 focus:border-brand-yellow/50"
-                        />
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Usuário</label>
+                        {existingUsers.length === 0 ? (
+                            <p className="text-sm text-gray-500 italic py-2">Nenhum usuário registrado. O usuário precisa criar uma conta na tela de login primeiro.</p>
+                        ) : (
+                            <select
+                                value={userForm.usuario_id}
+                                onChange={e => setUserForm({ ...userForm, usuario_id: e.target.value })}
+                                className="w-full bg-brand-darker border border-gray-800 rounded-lg h-12 px-4 text-sm text-gray-300 outline-none appearance-none"
+                            >
+                                <option value="">Selecione um usuário...</option>
+                                {existingUsers.map(u => (
+                                    <option key={u.id} value={u.id}>
+                                        {u.nome || u.email || u.id.slice(0, 8)}
+                                    </option>
+                                ))}
+                            </select>
+                        )}
                     </div>
                     <div className="space-y-2">
                         <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Loja</label>
