@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import {
-    Plus, Loader2, Store, Users, Shield, Trash2, UserPlus, Pencil, Save, X, Mail, Lock, ChevronRight, Calendar, User, Phone, FileText
+    Plus, Loader2, Store, Users, Shield, Trash2, UserPlus, Pencil, Save, X, Mail, Lock, ChevronRight, Calendar, User, Phone, FileText, Eye, EyeOff
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { supabase } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
+import { maskCPF, maskPhone, validateCPF, validatePhone, encodePassword, decodePassword } from "@/lib/masks";
 
 type Loja = { id: string; nome: string; is_matriz: boolean; created_at: string };
 type UserRole = {
@@ -26,6 +27,13 @@ type UsuarioPerfil = {
     nome: string;
     telefone: string;
     cpf: string;
+    senha: string;
+};
+
+type EditUserRole = {
+    id: string;
+    loja_id: string;
+    role: string;
 };
 
 const ROLES = [
@@ -68,9 +76,11 @@ export default function Admin() {
 
     // Editar Usuário
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-    const [editForm, setEditForm] = useState<UsuarioPerfil>({ id: '', email: '', nome: '', telefone: '', cpf: '' });
+    const [editForm, setEditForm] = useState<UsuarioPerfil>({ id: '', email: '', nome: '', telefone: '', cpf: '', senha: '' });
+    const [editUserRoles, setEditUserRoles] = useState<EditUserRole[]>([]);
     const [savingEdit, setSavingEdit] = useState(false);
     const [editError, setEditError] = useState<string | null>(null);
+    const [showPassword, setShowPassword] = useState(false);
 
     useEffect(() => {
         fetchLojas();
@@ -350,9 +360,10 @@ export default function Admin() {
 
     const handleOpenEdit = async (usuarioId: string) => {
         setEditError(null);
+        setShowPassword(false);
         const { data } = await supabase
             .from('usuarios')
-            .select('id, email, nome, telefone, cpf')
+            .select('id, email, nome, telefone, cpf, senha')
             .eq('id', usuarioId)
             .single();
 
@@ -361,17 +372,33 @@ export default function Admin() {
                 id: data.id,
                 email: data.email || '',
                 nome: data.nome || '',
-                telefone: data.telefone || '',
-                cpf: data.cpf || '',
+                telefone: data.telefone ? maskPhone(data.telefone) : '',
+                cpf: data.cpf ? maskCPF(data.cpf) : '',
+                senha: data.senha ? decodePassword(data.senha) : '',
             });
         } else {
-            setEditForm({ id: usuarioId, email: '', nome: '', telefone: '', cpf: '' });
+            setEditForm({ id: usuarioId, email: '', nome: '', telefone: '', cpf: '', senha: '' });
         }
+
+        const { data: userRoles } = await supabase
+            .from('usuario_loja_roles')
+            .select('id, loja_id, role')
+            .eq('usuario_id', usuarioId);
+
+        setEditUserRoles(userRoles || []);
         setIsEditModalOpen(true);
     };
 
     const handleUpdateUser = async () => {
         setEditError(null);
+
+        if (editForm.cpf && !validateCPF(editForm.cpf)) {
+            setEditError('CPF inválido.'); return;
+        }
+        if (editForm.telefone && !validatePhone(editForm.telefone)) {
+            setEditError('Telefone inválido.'); return;
+        }
+
         setSavingEdit(true);
         try {
             const { error } = await supabase
@@ -380,12 +407,20 @@ export default function Admin() {
                     id: editForm.id,
                     email: editForm.email || null,
                     nome: editForm.nome.trim() || null,
-                    telefone: editForm.telefone.trim() || null,
-                    cpf: editForm.cpf.trim() || null,
+                    telefone: editForm.telefone.replace(/\D/g, '') || null,
+                    cpf: editForm.cpf.replace(/\D/g, '') || null,
+                    senha: editForm.senha ? encodePassword(editForm.senha) : null,
                     updated_at: new Date().toISOString(),
                 }]);
 
             if (error) throw error;
+
+            for (const ur of editUserRoles) {
+                await supabase
+                    .from('usuario_loja_roles')
+                    .update({ loja_id: ur.loja_id, role: ur.role })
+                    .eq('id', ur.id);
+            }
 
             setIsEditModalOpen(false);
             await fetchRoles();
@@ -941,7 +976,7 @@ export default function Admin() {
                         <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Telefone</label>
                         <div className="relative group">
                             <Phone className="absolute left-3 top-3.5 h-4 w-4 text-gray-500 group-focus-within:text-brand-yellow" />
-                            <Input value={editForm.telefone} onChange={e => setEditForm({ ...editForm, telefone: e.target.value })}
+                            <Input value={editForm.telefone} onChange={e => setEditForm({ ...editForm, telefone: maskPhone(e.target.value) })}
                                 placeholder="(00) 00000-0000" className="bg-brand-darker border-gray-800 h-12 pl-10 focus:border-brand-yellow/50" />
                         </div>
                     </div>
@@ -949,10 +984,52 @@ export default function Admin() {
                         <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">CPF</label>
                         <div className="relative group">
                             <FileText className="absolute left-3 top-3.5 h-4 w-4 text-gray-500 group-focus-within:text-brand-yellow" />
-                            <Input value={editForm.cpf} onChange={e => setEditForm({ ...editForm, cpf: e.target.value })}
+                            <Input value={editForm.cpf} onChange={e => setEditForm({ ...editForm, cpf: maskCPF(e.target.value) })}
                                 placeholder="000.000.000-00" className="bg-brand-darker border-gray-800 h-12 pl-10 focus:border-brand-yellow/50" />
                         </div>
                     </div>
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Senha (referência)</label>
+                        <div className="relative group">
+                            <Lock className="absolute left-3 top-3.5 h-4 w-4 text-gray-500 group-focus-within:text-brand-yellow" />
+                            <Input type={showPassword ? 'text' : 'password'} value={editForm.senha}
+                                onChange={e => setEditForm({ ...editForm, senha: e.target.value })}
+                                placeholder="Senha de acesso" className="bg-brand-darker border-gray-800 h-12 pl-10 pr-12 focus:border-brand-yellow/50" />
+                            <button type="button" onClick={() => setShowPassword(!showPassword)}
+                                className="absolute right-3 top-3.5 text-gray-500 hover:text-brand-yellow transition-colors">
+                                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </button>
+                        </div>
+                    </div>
+
+                    {editUserRoles.length > 0 && (
+                        <div className="space-y-2 pt-2 border-t border-gray-800">
+                            <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Atribuições</label>
+                            {editUserRoles.map((ur, idx) => (
+                                <div key={ur.id} className="flex items-center gap-2">
+                                    <Store className="h-4 w-4 text-gray-500 shrink-0" />
+                                    <select value={ur.loja_id}
+                                        onChange={e => {
+                                            const updated = [...editUserRoles];
+                                            updated[idx] = { ...ur, loja_id: e.target.value };
+                                            setEditUserRoles(updated);
+                                        }}
+                                        className="flex-1 bg-brand-dark border border-gray-700 rounded-lg h-9 px-3 text-sm text-gray-300 outline-none appearance-none">
+                                        {lojas.map(l => <option key={l.id} value={l.id}>{l.nome}</option>)}
+                                    </select>
+                                    <select value={ur.role}
+                                        onChange={e => {
+                                            const updated = [...editUserRoles];
+                                            updated[idx] = { ...ur, role: e.target.value };
+                                            setEditUserRoles(updated);
+                                        }}
+                                        className="bg-brand-dark border border-gray-700 rounded-lg h-9 px-3 text-sm text-gray-300 outline-none appearance-none">
+                                        {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                                    </select>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             </Modal>
         </div>

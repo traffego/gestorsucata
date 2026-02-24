@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import {
-    Plus, Loader2, Store, Users, Trash2, Pencil, Save, X, ChevronRight, Calendar, UserPlus, Mail, Lock, User
+    Plus, Loader2, Store, Users, Trash2, Pencil, Save, X, ChevronRight, Calendar, UserPlus, Mail, Lock, User, Shield, Check
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -40,6 +40,11 @@ export default function Lojas() {
     const [editingLojaName, setEditingLojaName] = useState(false);
     const [editLojaNameValue, setEditLojaNameValue] = useState('');
     const [savingLojaName, setSavingLojaName] = useState(false);
+
+    // Edição inline de role
+    const [editingRoleId, setEditingRoleId] = useState<string | null>(null);
+    const [editingRoleValue, setEditingRoleValue] = useState('');
+    const [savingRole, setSavingRole] = useState(false);
 
     // Novo Usuário (from store detail)
     const [isNewUserModalOpen, setIsNewUserModalOpen] = useState(false);
@@ -138,6 +143,21 @@ export default function Lojas() {
         else if (selectedLoja && isLojaDetailOpen) {
             handleOpenLojaDetail(selectedLoja);
         }
+    };
+
+    const handleUpdateRole = async (roleId: string, newRole: string) => {
+        setSavingRole(true);
+        const { error } = await supabase
+            .from('usuario_loja_roles')
+            .update({ role: newRole })
+            .eq('id', roleId);
+        if (error) {
+            alert(`Erro: ${error.message}`);
+        } else {
+            setEditingRoleId(null);
+            if (selectedLoja) handleOpenLojaDetail(selectedLoja);
+        }
+        setSavingRole(false);
     };
 
     const handleCreateNewUser = async () => {
@@ -369,34 +389,55 @@ export default function Lojas() {
                             ) : (
                                 <div className="space-y-2">
                                     {lojaDetailUsers.map(u => (
-                                        <div key={u.id} className="flex items-center justify-between bg-brand-darker border border-gray-800 rounded-xl px-4 py-3">
-                                            <div className="flex items-center gap-3">
-                                                <div className="h-8 w-8 rounded-full bg-gray-800 flex items-center justify-center">
-                                                    <Users className="h-4 w-4 text-gray-400" />
+                                        <div key={u.id} className="bg-brand-darker border border-gray-800 rounded-xl px-4 py-3 space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="h-8 w-8 rounded-full bg-gray-800 flex items-center justify-center">
+                                                        <Users className="h-4 w-4 text-gray-400" />
+                                                    </div>
+                                                    <div>
+                                                        {u.nome && (
+                                                            <p className="text-sm font-bold text-white">{u.nome}</p>
+                                                        )}
+                                                        <p className={cn(
+                                                            "text-sm",
+                                                            u.nome ? "text-gray-400" : "font-bold text-white"
+                                                        )}>{u.email}</p>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    {u.nome && (
-                                                        <p className="text-sm font-bold text-white">{u.nome}</p>
+                                                <div className="flex items-center gap-1">
+                                                    {u.role !== 'superadmin' && (
+                                                        <>
+                                                            <Button variant="ghost" size="icon" className="text-gray-500 hover:text-brand-yellow h-8 w-8"
+                                                                onClick={() => { setEditingRoleId(editingRoleId === u.id ? null : u.id); setEditingRoleValue(u.role); }}>
+                                                                <Shield className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                            <Button variant="ghost" size="icon" className="text-gray-600 hover:text-red-500 h-8 w-8"
+                                                                onClick={() => handleDeleteRole(u.id)}>
+                                                                <Trash2 className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                        </>
                                                     )}
-                                                    <p className={cn(
-                                                        "text-sm",
-                                                        u.nome ? "text-gray-400" : "font-bold text-white"
-                                                    )}>{u.email}</p>
-                                                    <span className={cn(
-                                                        "text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-widest",
-                                                        u.role === 'superadmin' ? "bg-brand-yellow/10 text-brand-yellow" :
-                                                            u.role === 'gerente' ? "bg-green-500/10 text-green-400" :
-                                                                "bg-blue-500/10 text-blue-400"
-                                                    )}>
-                                                        {u.role}
-                                                    </span>
                                                 </div>
                                             </div>
-                                            {u.role !== 'superadmin' && (
-                                                <Button variant="ghost" size="icon" className="text-gray-600 hover:text-red-500 h-8 w-8"
-                                                    onClick={() => handleDeleteRole(u.id)}>
-                                                    <Trash2 className="h-3.5 w-3.5" />
-                                                </Button>
+                                            {editingRoleId === u.id && u.role !== 'superadmin' && (
+                                                <div className="flex items-center gap-2 pt-1 border-t border-gray-800">
+                                                    <Shield className="h-4 w-4 text-gray-500 shrink-0" />
+                                                    <select
+                                                        value={editingRoleValue}
+                                                        onChange={e => setEditingRoleValue(e.target.value)}
+                                                        className="flex-1 bg-brand-dark border border-gray-700 rounded-lg h-9 px-3 text-sm text-gray-300 outline-none appearance-none"
+                                                    >
+                                                        {ROLES.map(r => (
+                                                            <option key={r.value} value={r.value}>{r.label} — {r.desc}</option>
+                                                        ))}
+                                                    </select>
+                                                    <Button size="sm" disabled={savingRole || editingRoleValue === u.role}
+                                                        onClick={() => handleUpdateRole(u.id, editingRoleValue)}
+                                                        className="bg-green-600 hover:bg-green-700 text-white h-9 px-3">
+                                                        {savingRole ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                                                    </Button>
+                                                </div>
                                             )}
                                         </div>
                                     ))}
