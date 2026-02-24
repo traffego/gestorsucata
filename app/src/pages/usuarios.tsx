@@ -261,15 +261,6 @@ export default function Usuarios() {
         setSavingEdit(false);
     };
 
-    // Agrupar roles por usuario_id para evitar duplicatas visuais
-    const uniqueUsers = roles.reduce((acc, r) => {
-        if (!acc.find(u => u.usuario_id === r.usuario_id)) {
-            const userRoles = roles.filter(ur => ur.usuario_id === r.usuario_id);
-            acc.push({ ...r, allRoles: userRoles });
-        }
-        return acc;
-    }, [] as (UserRole & { allRoles: UserRole[] })[]);
-
     return (
         <div className="space-y-8">
             <div>
