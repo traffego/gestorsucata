@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import {
-    Plus, Loader2, Store, Users, Trash2, Pencil, Save, X, ChevronRight, Calendar, UserPlus, Mail, Lock
+    Plus, Loader2, Store, Users, Trash2, Pencil, Save, X, ChevronRight, Calendar, UserPlus, Mail, Lock, User
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ type UserRole = {
     loja_id: string;
     role: string;
     email?: string;
+    nome?: string;
     loja_nome?: string;
 };
 
@@ -42,7 +43,7 @@ export default function Lojas() {
 
     // Novo Usuário (from store detail)
     const [isNewUserModalOpen, setIsNewUserModalOpen] = useState(false);
-    const [newUserForm, setNewUserForm] = useState({ email: '', password: '', loja_id: '', role: 'vendedor' });
+    const [newUserForm, setNewUserForm] = useState({ email: '', password: '', nome: '', loja_id: '', role: 'vendedor' });
     const [savingNewUser, setSavingNewUser] = useState(false);
     const [newUserError, setNewUserError] = useState<string | null>(null);
 
@@ -101,7 +102,8 @@ export default function Lojas() {
                     .single();
                 return {
                     ...r,
-                    email: userData?.email || userData?.nome || r.usuario_id.slice(0, 8),
+                    email: userData?.email || r.usuario_id.slice(0, 8),
+                    nome: userData?.nome || '',
                     loja_nome: loja.nome
                 };
             }));
@@ -178,7 +180,7 @@ export default function Lojas() {
                 setNewUserError('Erro ao criar usuário: ID não retornado.'); setSavingNewUser(false); return;
             }
 
-            await supabase.from('usuarios').upsert([{ id: newUserId, email: newUserForm.email.trim() }]);
+            await supabase.from('usuarios').upsert([{ id: newUserId, email: newUserForm.email.trim(), nome: newUserForm.nome.trim() || null }]);
 
             const { error: roleError } = await supabase
                 .from('usuario_loja_roles')
@@ -189,7 +191,7 @@ export default function Lojas() {
             }
 
             setIsNewUserModalOpen(false);
-            setNewUserForm({ email: '', password: '', loja_id: '', role: 'vendedor' });
+            setNewUserForm({ email: '', password: '', nome: '', loja_id: '', role: 'vendedor' });
             setNewUserError(null);
             alert('Usuário criado com sucesso!');
             if (selectedLoja) handleOpenLojaDetail(selectedLoja);
@@ -373,7 +375,13 @@ export default function Lojas() {
                                                     <Users className="h-4 w-4 text-gray-400" />
                                                 </div>
                                                 <div>
-                                                    <p className="text-sm font-bold text-white">{u.email}</p>
+                                                    {u.nome && (
+                                                        <p className="text-sm font-bold text-white">{u.nome}</p>
+                                                    )}
+                                                    <p className={cn(
+                                                        "text-sm",
+                                                        u.nome ? "text-gray-400" : "font-bold text-white"
+                                                    )}>{u.email}</p>
                                                     <span className={cn(
                                                         "text-[9px] px-1.5 py-0.5 rounded font-bold uppercase tracking-widest",
                                                         u.role === 'superadmin' ? "bg-brand-yellow/10 text-brand-yellow" :
@@ -420,6 +428,14 @@ export default function Lojas() {
                             <X className="h-4 w-4 shrink-0" /><p>{newUserError}</p>
                         </div>
                     )}
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Nome</label>
+                        <div className="relative group">
+                            <User className="absolute left-3 top-3.5 h-4 w-4 text-gray-500 group-focus-within:text-brand-yellow" />
+                            <Input value={newUserForm.nome} onChange={e => setNewUserForm({ ...newUserForm, nome: e.target.value })}
+                                placeholder="Nome completo" className="bg-brand-darker border-gray-800 h-12 pl-10 focus:border-brand-yellow/50" />
+                        </div>
+                    </div>
                     <div className="space-y-2">
                         <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Email</label>
                         <div className="relative group">

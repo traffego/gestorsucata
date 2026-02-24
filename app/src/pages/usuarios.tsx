@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import {
-    Plus, Loader2, Users, Trash2, UserPlus, X, Mail, Lock
+    Plus, Loader2, Users, Trash2, UserPlus, X, Mail, Lock, Pencil, User, Phone, FileText
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,16 @@ type UserRole = {
     loja_id: string;
     role: string;
     email?: string;
+    nome?: string;
     loja_nome?: string;
+};
+
+type UsuarioPerfil = {
+    id: string;
+    email: string;
+    nome: string;
+    telefone: string;
+    cpf: string;
 };
 
 const ROLES = [
@@ -37,9 +46,15 @@ export default function Usuarios() {
 
     // Novo Usuário
     const [isNewUserModalOpen, setIsNewUserModalOpen] = useState(false);
-    const [newUserForm, setNewUserForm] = useState({ email: '', password: '', loja_id: '', role: 'vendedor' });
+    const [newUserForm, setNewUserForm] = useState({ email: '', password: '', nome: '', loja_id: '', role: 'vendedor' });
     const [savingNewUser, setSavingNewUser] = useState(false);
     const [newUserError, setNewUserError] = useState<string | null>(null);
+
+    // Editar Usuário
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [editForm, setEditForm] = useState<UsuarioPerfil>({ id: '', email: '', nome: '', telefone: '', cpf: '' });
+    const [savingEdit, setSavingEdit] = useState(false);
+    const [editError, setEditError] = useState<string | null>(null);
 
     useEffect(() => {
         fetchLojas();
@@ -69,7 +84,8 @@ export default function Usuarios() {
                 const loja = lojasToUse.find(l => l.id === r.loja_id);
                 return {
                     ...r,
-                    email: userData?.email || userData?.nome || r.usuario_id.slice(0, 8),
+                    email: userData?.email || r.usuario_id.slice(0, 8),
+                    nome: userData?.nome || '',
                     loja_nome: loja?.nome || 'Desconhecida'
                 };
             }));
@@ -161,7 +177,11 @@ export default function Usuarios() {
                 setNewUserError('Erro ao criar usuário: ID não retornado.'); setSavingNewUser(false); return;
             }
 
-            await supabase.from('usuarios').upsert([{ id: newUserId, email: newUserForm.email.trim() }]);
+            await supabase.from('usuarios').upsert([{
+                id: newUserId,
+                email: newUserForm.email.trim(),
+                nome: newUserForm.nome.trim() || null,
+            }]);
 
             const { error: roleError } = await supabase
                 .from('usuario_loja_roles')
@@ -172,7 +192,7 @@ export default function Usuarios() {
             }
 
             setIsNewUserModalOpen(false);
-            setNewUserForm({ email: '', password: '', loja_id: '', role: 'vendedor' });
+            setNewUserForm({ email: '', password: '', nome: '', loja_id: '', role: 'vendedor' });
             setNewUserError(null);
             await fetchRoles();
             await fetchExistingUsers();
@@ -182,6 +202,73 @@ export default function Usuarios() {
         }
         setSavingNewUser(false);
     };
+
+    // ======= EDITAR USUÁRIO =======
+
+    const handleOpenEdit = async (usuarioId: string) => {
+        setEditError(null);
+        const { data } = await supabase
+            .from('usuarios')
+            .select('id, email, nome, telefone, cpf')
+            .eq('id', usuarioId)
+            .single();
+
+        if (data) {
+            setEditForm({
+                id: data.id,
+                email: data.email || '',
+                nome: data.nome || '',
+                telefone: data.telefone || '',
+                cpf: data.cpf || '',
+            });
+        } else {
+            // Se não existir registro na tabela usuarios, cria um vazio
+            setEditForm({
+                id: usuarioId,
+                email: '',
+                nome: '',
+                telefone: '',
+                cpf: '',
+            });
+        }
+        setIsEditModalOpen(true);
+    };
+
+    const handleUpdateUser = async () => {
+        setEditError(null);
+        setSavingEdit(true);
+        try {
+            const { error } = await supabase
+                .from('usuarios')
+                .upsert([{
+                    id: editForm.id,
+                    email: editForm.email || null,
+                    nome: editForm.nome.trim() || null,
+                    telefone: editForm.telefone.trim() || null,
+                    cpf: editForm.cpf.trim() || null,
+                    updated_at: new Date().toISOString(),
+                }]);
+
+            if (error) throw error;
+
+            setIsEditModalOpen(false);
+            await fetchRoles();
+            await fetchExistingUsers();
+            alert('Perfil atualizado com sucesso!');
+        } catch (err: any) {
+            setEditError(err.message || 'Erro ao salvar.');
+        }
+        setSavingEdit(false);
+    };
+
+    // Agrupar roles por usuario_id para evitar duplicatas visuais
+    const uniqueUsers = roles.reduce((acc, r) => {
+        if (!acc.find(u => u.usuario_id === r.usuario_id)) {
+            const userRoles = roles.filter(ur => ur.usuario_id === r.usuario_id);
+            acc.push({ ...r, allRoles: userRoles });
+        }
+        return acc;
+    }, [] as (UserRole & { allRoles: UserRole[] })[]);
 
     return (
         <div className="space-y-8">
@@ -225,7 +312,13 @@ export default function Usuarios() {
                                             <Users className="h-5 w-5 text-gray-400" />
                                         </div>
                                         <div>
-                                            <p className="font-bold text-white text-sm">{r.email}</p>
+                                            {r.nome && (
+                                                <p className="font-bold text-white text-sm">{r.nome}</p>
+                                            )}
+                                            <p className={cn(
+                                                "text-sm",
+                                                r.nome ? "text-gray-400" : "font-bold text-white"
+                                            )}>{r.email}</p>
                                             <div className="flex items-center gap-2 mt-1">
                                                 <span className={cn(
                                                     "text-[10px] px-2 py-0.5 rounded font-bold uppercase tracking-widest",
@@ -239,12 +332,18 @@ export default function Usuarios() {
                                             </div>
                                         </div>
                                     </div>
-                                    {r.role !== 'superadmin' && (
-                                        <Button variant="ghost" size="icon" className="text-gray-500 hover:text-red-500"
-                                            onClick={() => handleDeleteRole(r.id)}>
-                                            <Trash2 className="h-4 w-4" />
+                                    <div className="flex items-center gap-1">
+                                        <Button variant="ghost" size="icon" className="text-gray-500 hover:text-brand-yellow"
+                                            onClick={() => handleOpenEdit(r.usuario_id)}>
+                                            <Pencil className="h-4 w-4" />
                                         </Button>
-                                    )}
+                                        {r.role !== 'superadmin' && (
+                                            <Button variant="ghost" size="icon" className="text-gray-500 hover:text-red-500"
+                                                onClick={() => handleDeleteRole(r.id)}>
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        )}
+                                    </div>
                                 </CardContent>
                             </Card>
                         ))}
@@ -331,6 +430,14 @@ export default function Usuarios() {
                         </div>
                     )}
                     <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Nome</label>
+                        <div className="relative group">
+                            <User className="absolute left-3 top-3.5 h-4 w-4 text-gray-500 group-focus-within:text-brand-yellow" />
+                            <Input value={newUserForm.nome} onChange={e => setNewUserForm({ ...newUserForm, nome: e.target.value })}
+                                placeholder="Nome completo" className="bg-brand-darker border-gray-800 h-12 pl-10 focus:border-brand-yellow/50" />
+                        </div>
+                    </div>
+                    <div className="space-y-2">
                         <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Email</label>
                         <div className="relative group">
                             <Mail className="absolute left-3 top-3.5 h-4 w-4 text-gray-500 group-focus-within:text-brand-yellow" />
@@ -368,6 +475,62 @@ export default function Usuarios() {
                                     <p className="text-[10px] mt-0.5 opacity-60">{r.desc}</p>
                                 </button>
                             ))}
+                        </div>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* MODAL: Editar Perfil */}
+            <Modal
+                isOpen={isEditModalOpen}
+                onClose={() => { setIsEditModalOpen(false); setEditError(null); }}
+                title="Editar Perfil"
+                description="Atualize os dados do usuário."
+                footer={
+                    <>
+                        <Button variant="outline" onClick={() => { setIsEditModalOpen(false); setEditError(null); }} className="border-gray-800">Cancelar</Button>
+                        <Button onClick={handleUpdateUser} disabled={savingEdit} className="bg-brand-red text-white hover:bg-brand-red/90 font-bold uppercase tracking-widest">
+                            {savingEdit ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Pencil className="h-4 w-4 mr-2" />} Salvar
+                        </Button>
+                    </>
+                }
+            >
+                <div className="space-y-4">
+                    {editError && (
+                        <div className="flex items-center gap-2 rounded-lg bg-red-500/10 p-3 text-sm text-red-400 border border-red-500/20">
+                            <X className="h-4 w-4 shrink-0" /><p>{editError}</p>
+                        </div>
+                    )}
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Email</label>
+                        <div className="relative group">
+                            <Mail className="absolute left-3 top-3.5 h-4 w-4 text-gray-500" />
+                            <Input type="email" value={editForm.email} readOnly
+                                className="bg-brand-darker border-gray-800 h-12 pl-10 text-gray-500 cursor-not-allowed" />
+                        </div>
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Nome</label>
+                        <div className="relative group">
+                            <User className="absolute left-3 top-3.5 h-4 w-4 text-gray-500 group-focus-within:text-brand-yellow" />
+                            <Input value={editForm.nome} onChange={e => setEditForm({ ...editForm, nome: e.target.value })}
+                                placeholder="Nome completo" className="bg-brand-darker border-gray-800 h-12 pl-10 focus:border-brand-yellow/50" />
+                        </div>
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Telefone</label>
+                        <div className="relative group">
+                            <Phone className="absolute left-3 top-3.5 h-4 w-4 text-gray-500 group-focus-within:text-brand-yellow" />
+                            <Input value={editForm.telefone} onChange={e => setEditForm({ ...editForm, telefone: e.target.value })}
+                                placeholder="(00) 00000-0000" className="bg-brand-darker border-gray-800 h-12 pl-10 focus:border-brand-yellow/50" />
+                        </div>
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">CPF</label>
+                        <div className="relative group">
+                            <FileText className="absolute left-3 top-3.5 h-4 w-4 text-gray-500 group-focus-within:text-brand-yellow" />
+                            <Input value={editForm.cpf} onChange={e => setEditForm({ ...editForm, cpf: e.target.value })}
+                                placeholder="000.000.000-00" className="bg-brand-darker border-gray-800 h-12 pl-10 focus:border-brand-yellow/50" />
                         </div>
                     </div>
                 </div>
