@@ -32,7 +32,14 @@ export default function Login() {
             navigate(from, { replace: true });
         } catch (err: any) {
             console.error('Login error:', err);
-            setError(err.message || 'Erro ao realizar login. Verifique suas credenciais.');
+            const msg = err.message || '';
+            if (msg.includes('Email not confirmed')) {
+                setError('Por favor, acesse seu email para confirmar seu cadastro na plataforma.');
+            } else if (msg.includes('Invalid login credentials')) {
+                setError('Email ou senha incorretos.');
+            } else {
+                setError('Erro ao realizar login. Verifique suas credenciais.');
+            }
         } finally {
             setLoading(false);
         }
