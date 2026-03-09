@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabase";
 import { useStore } from "@/contexts/StoreContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { SalesReport } from "@/components/SalesReport";
 
 interface SaleItem {
     id: string;
@@ -30,17 +32,22 @@ interface Sale {
 }
 
 export default function Vendas() {
-    const { lojaAtual } = useStore();
+    const { lojaAtual, isSuperAdmin } = useStore();
+    const { user } = useAuth();
     const [sales, setSales] = useState<Sale[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
     const [expandedSaleId, setExpandedSaleId] = useState<string | null>(null);
     const [limit, setLimit] = useState(50); // Limite inicial de registros
     const [hasMore, setHasMore] = useState(true);
+    
+    // Filtro de datas
+    const [startDate, setStartDate] = useState(() => new Date().toISOString().split('T')[0]);
+    const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0]);
 
     useEffect(() => {
-        if (lojaAtual) fetchSales();
-    }, [lojaAtual, limit, searchTerm]); // Atualiza quando mudar loja, limite ou termo de busca
+        if (lojaAtual && user) fetchSales();
+    }, [lojaAtual, limit, searchTerm, startDate, endDate, user]); // Atualiza quando mudar loja, limite, termo de busca ou datas
 
     async function fetchSales() {
         setLoading(true);
@@ -57,7 +64,20 @@ export default function Vendas() {
                 `)
                 .order('data_venda', { ascending: false });
 
-            if (lojaAtual) query.eq('loja_id', lojaAtual.id);
+            if (lojaAtual) query = query.eq('loja_id', lojaAtual.id);
+            if (user && !isSuperAdmin) {
+                // Vendedor vê apenas suas vendas
+                query = query.eq('vendedor_id', user.id);
+            }
+            
+            // Filtro de data
+            const start = new Date(startDate);
+            start.setHours(0, 0, 0, 0);
+            const end = new Date(endDate);
+            end.setHours(23, 59, 59, 999);
+            
+            query = query.gte('data_venda', start.toISOString());
+            query = query.lte('data_venda', end.toISOString());
             
             // Filtro no banco se houver termo de busca (ID exato ou parte dele)
             if (searchTerm.trim() !== '') {
@@ -186,6 +206,14 @@ export default function Vendas() {
 
     return (
         <div className="space-y-6">
+            {/* Relatório de Vendas (apenas para vendedor ou geral) */}
+            <SalesReport 
+                onDateRangeChange={(start, end) => {
+                    setStartDate(start);
+                    setEndDate(end);
+                }} 
+            />
+
             <Card className="bg-brand-dark border-gray-800 text-white">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">

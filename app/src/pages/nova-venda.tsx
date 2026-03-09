@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/contexts/AuthContext";
 import { useStore } from "@/contexts/StoreContext";
+import { SalesReport } from "@/components/SalesReport";
 
 export default function NovaVenda() {
     const { user } = useAuth();
@@ -104,6 +105,9 @@ export default function NovaVenda() {
 
     return (
         <div className="max-w-xl mx-auto">
+            {/* Relatório de vendas encapsulado para o vendedor */}
+            <SalesReport />
+
             <Card className="bg-brand-dark border-gray-800 text-white">
                 <CardHeader>
                     <CardTitle className="text-2xl font-black uppercase tracking-tight">
