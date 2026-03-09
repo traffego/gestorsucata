@@ -125,29 +125,29 @@ export function SalesReport({ onDateRangeChange }: SalesReportProps) {
     return (
         <Card className="bg-brand-dark border-gray-800 text-white mb-6">
             <CardHeader className="pb-4 border-b border-gray-800/50">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <CardTitle className="flex items-center gap-2 text-lg">
+                <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+                    <CardTitle className="flex items-center gap-2 text-lg whitespace-nowrap">
                         <DollarSign className="h-5 w-5 text-brand-yellow" />
                         Resumo de Vendas
                     </CardTitle>
                     
-                    <div className="flex items-center gap-2 bg-brand-darker/50 p-1.5 rounded-lg border border-gray-800">
-                        <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2 bg-brand-darker/50 p-1.5 rounded-lg border border-gray-800">
+                        <div className="flex items-center gap-1">
                             <Calendar className="h-4 w-4 text-gray-500 ml-2" />
                             <Input 
                                 type="date" 
                                 value={startDate}
                                 onChange={(e) => setStartDate(e.target.value)}
-                                className="bg-transparent border-0 h-8 text-xs text-brand-yellow focus-visible:ring-0 px-2 w-[120px]"
+                                className="bg-transparent border-0 h-8 text-xs text-brand-yellow focus-visible:ring-0 px-1 sm:px-2 w-[110px] sm:w-[120px]"
                             />
                         </div>
                         <span className="text-gray-600 text-xs">até</span>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
                             <Input 
                                 type="date" 
                                 value={endDate}
                                 onChange={(e) => setEndDate(e.target.value)}
-                                className="bg-transparent border-0 h-8 text-xs text-brand-yellow focus-visible:ring-0 px-2 w-[120px]"
+                                className="bg-transparent border-0 h-8 text-xs text-brand-yellow focus-visible:ring-0 px-1 sm:px-2 w-[110px] sm:w-[120px]"
                             />
                         </div>
                         {loading && <Loader2 className="h-4 w-4 animate-spin text-gray-500 mr-2" />}
@@ -155,7 +155,7 @@ export function SalesReport({ onDateRangeChange }: SalesReportProps) {
                 </div>
             </CardHeader>
             <CardContent className="pt-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
                     {/* Totais Fixos */}
                     <div className="space-y-4">
                         <div>
@@ -173,7 +173,7 @@ export function SalesReport({ onDateRangeChange }: SalesReportProps) {
                     </div>
 
                     {/* Resumo por Formas de Pagamento (Filtro) */}
-                    <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div className="xl:col-span-3 md:col-span-1 grid grid-cols-1 sm:grid-cols-3 md:grid-cols-1 xl:grid-cols-3 gap-4">
                         <div className="bg-brand-darker/30 border border-gray-800 rounded-xl p-4 flex flex-col justify-center">
                             <div className="flex items-center justify-between mb-2">
                                 <Zap className="h-5 w-5 text-brand-yellow" />

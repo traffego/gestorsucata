@@ -104,12 +104,11 @@ export default function NovaVenda() {
     const paymentLabels = { dinheiro: 'Dinheiro', cartao: 'Cartão', pix: 'PIX' };
 
     return (
-        <div className="max-w-xl mx-auto">
-            {/* Relatório de vendas encapsulado para o vendedor */}
-            <SalesReport />
-
-            <Card className="bg-brand-dark border-gray-800 text-white">
-                <CardHeader>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 max-w-7xl mx-auto items-start">
+            {/* PDV (Nova Venda) */}
+            <div className="lg:col-span-5 order-1">
+                <Card className="bg-brand-dark border-gray-800 text-white">
+                    <CardHeader>
                     <CardTitle className="text-2xl font-black uppercase tracking-tight">
                         Nova Venda
                     </CardTitle>
@@ -221,6 +220,12 @@ export default function NovaVenda() {
 
                 </CardContent>
             </Card>
+            </div>
+
+            {/* Relatório de vendas (Card de filtros) */}
+            <div className="lg:col-span-7 order-2">
+                <SalesReport />
+            </div>
         </div>
     );
 }
