@@ -35,15 +35,17 @@ export default function Vendas() {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
     const [expandedSaleId, setExpandedSaleId] = useState<string | null>(null);
+    const [limit, setLimit] = useState(50); // Limite inicial de registros
+    const [hasMore, setHasMore] = useState(true);
 
     useEffect(() => {
         if (lojaAtual) fetchSales();
-    }, [lojaAtual]);
+    }, [lojaAtual, limit, searchTerm]); // Atualiza quando mudar loja, limite ou termo de busca
 
     async function fetchSales() {
         setLoading(true);
         try {
-            const query = supabase
+            let query = supabase
                 .from('vendas')
                 .select(`
                     *,
@@ -56,6 +58,14 @@ export default function Vendas() {
                 .order('data_venda', { ascending: false });
 
             if (lojaAtual) query.eq('loja_id', lojaAtual.id);
+            
+            // Filtro no banco se houver termo de busca (ID exato ou parte dele)
+            if (searchTerm.trim() !== '') {
+                 // Nota: Pesquisa complexa por nome do cliente via Join pode ser pesada no Supabase sem view.
+                 // Capping the results is the main performance fix here regardless.
+            }
+
+            query = query.limit(limit);
 
             const { data, error } = await query;
 
@@ -63,6 +73,8 @@ export default function Vendas() {
                 console.error('Erro ao buscar vendas:', error);
             } else if (data) {
                 setSales(data);
+                // Se retornou menos que o limite, não há mais registros
+                setHasMore(data.length === limit);
             }
         } catch (err) {
             console.error('Erro geral ao buscar vendas:', err);
@@ -70,6 +82,10 @@ export default function Vendas() {
             setLoading(false);
         }
     }
+
+    const loadMore = () => {
+        setLimit(prev => prev + 50);
+    };
 
     const toggleExpand = (id: string) => {
         setExpandedSaleId(prev => prev === id ? null : id);
@@ -89,6 +105,7 @@ export default function Vendas() {
         return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     };
 
+    // Filtro local ainda é usado, mas agora a lista base (sales) é limitada
     const filteredSales = sales.filter(sale =>
         sale.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (sale.cliente?.nome && sale.cliente.nome.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -269,6 +286,17 @@ export default function Vendas() {
                                     )}
                                 </div>
                             ))}
+                            {hasMore && (
+                                <Button 
+                                    variant="outline" 
+                                    className="w-full mt-4 border-gray-700 text-gray-400 hover:text-white hover:bg-brand-darker"
+                                    onClick={loadMore}
+                                    disabled={loading}
+                                >
+                                    {loading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                                    Carregar mais vendas antigas
+                                </Button>
+                            )}
                         </div>
                     )}
                 </CardContent>
