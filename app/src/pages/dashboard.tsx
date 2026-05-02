@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
     LineChart, Line, BarChart, Bar, AreaChart, Area,
     CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell
@@ -21,7 +21,7 @@ type StoreFinancials = {
 };
 
 export default function Dashboard() {
-    const { lojaAtual, isSuperAdmin } = useStore();
+    const { lojaAtual, isSuperAdmin, loadingStore } = useStore();
 
     // Store filter (superadmin only)
     const [allLojas, setAllLojas] = useState<Loja[]>([]);
@@ -40,32 +40,10 @@ export default function Dashboard() {
     const [performanceVendedor, setPerformanceVendedor] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // Fetch lojas for superadmin filter
-    useEffect(() => {
-        if (isSuperAdmin) {
-            supabase.from('lojas').select('id, nome, is_matriz').order('created_at')
-                .then(({ data }) => setAllLojas(data || []));
-        }
-    }, [isSuperAdmin]);
-
-    // Fetch data when filter or lojaAtual changes
-    useEffect(() => {
-        if (isSuperAdmin) {
-            fetchDashboardData();
-        } else if (lojaAtual) {
-            fetchDashboardData();
-        }
-    }, [lojaAtual, isSuperAdmin, selectedFilter, allLojas]);
-
-    function getFilteredLojaId(): string | null {
-        if (!isSuperAdmin) return lojaAtual?.id || null;
-        return selectedFilter; // null = todas
-    }
-
-    async function fetchDashboardData() {
+    const fetchDashboardData = useCallback(async () => {
         setLoading(true);
+        const filterLojaId = !isSuperAdmin ? (lojaAtual?.id || null) : selectedFilter;
         try {
-            const filterLojaId = getFilteredLojaId();
 
             // 0. Users map
             const { data: userData } = await supabase.from('usuarios').select('id, nome');
@@ -107,7 +85,6 @@ export default function Dashboard() {
 
             // === PER-STORE BREAKDOWN (superadmin + "Todas") ===
             if (isSuperAdmin && !filterLojaId && allLojas.length > 0) {
-                // Fetch all vendas (unfiltered for per-store)
                 const { data: allVendasUnfiltered } = await supabase.from('vendas').select('valor_total, loja_id');
                 const { data: allContasUnfiltered } = await supabase.from('contas_a_pagar').select('valor, loja_id').eq('status', 'pago');
 
@@ -234,7 +211,27 @@ export default function Dashboard() {
         } finally {
             setLoading(false);
         }
-    }
+    // allLojas via closure — intencionalmente fora das deps para não causar loop
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [lojaAtual, isSuperAdmin, selectedFilter]);
+
+    // Fetch lojas for superadmin filter
+    useEffect(() => {
+        if (isSuperAdmin) {
+            supabase.from('lojas').select('id, nome, is_matriz').order('created_at')
+                .then(({ data }) => setAllLojas(data || []));
+        }
+    }, [isSuperAdmin]);
+
+    // Fetch data when filter or lojaAtual changes
+    useEffect(() => {
+        if (loadingStore) return;
+        if (isSuperAdmin || lojaAtual) {
+            fetchDashboardData();
+        }
+    }, [loadingStore, isSuperAdmin, lojaAtual, selectedFilter, fetchDashboardData]);
+
+
 
     const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
