@@ -477,7 +477,7 @@ export default function Dashboard() {
 
             {/* ===== EXISTING CHARTS ===== */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <Card className="bg-brand-dark border-gray-800 text-white col-span-1">
+                <Card className="bg-brand-dark border-gray-800 text-white col-span-1 min-w-0">
                     <CardHeader className="pb-2">
                         <CardTitle className="text-sm font-medium text-gray-400">Fluxo de Caixa (Mensal)</CardTitle>
                     </CardHeader>
@@ -499,7 +499,7 @@ export default function Dashboard() {
                     </CardContent>
                 </Card>
 
-                <Card className="bg-brand-dark border-gray-800 text-white col-span-1">
+                <Card className="bg-brand-dark border-gray-800 text-white col-span-1 min-w-0">
                     <CardHeader className="pb-2">
                         <CardTitle className="text-sm font-medium text-gray-400">Despesas (Categorias)</CardTitle>
                     </CardHeader>
@@ -518,7 +518,7 @@ export default function Dashboard() {
                     </CardContent>
                 </Card>
 
-                <Card className="bg-brand-dark border-gray-800 text-white col-span-1">
+                <Card className="bg-brand-dark border-gray-800 text-white col-span-1 min-w-0">
                     <CardHeader className="pb-2">
                         <CardTitle className="text-sm font-medium text-gray-400">Lucro Líquido (Trimestral)</CardTitle>
                     </CardHeader>
@@ -537,7 +537,7 @@ export default function Dashboard() {
                     </CardContent>
                 </Card>
 
-                <Card className="bg-brand-dark border-gray-800 text-white col-span-1">
+                <Card className="bg-brand-dark border-gray-800 text-white col-span-1 min-w-0">
                     <CardHeader className="pb-2">
                         <CardTitle className="text-sm font-medium text-gray-400">Distribuição de Estoque</CardTitle>
                     </CardHeader>
