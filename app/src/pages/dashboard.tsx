@@ -212,7 +212,7 @@ export default function Dashboard() {
             const { data: yearExpenses } = await supabase
                 .from('transacoes')
                 .select('data_transacao, valor, categoria, tipo')
-                .gte('data_transacao', currentYearStart);
+                .gte('data_transacao', dateStart).lte('data_transacao', dateEnd);
 
             const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
             const currentMonthIndex = new Date().getMonth();
