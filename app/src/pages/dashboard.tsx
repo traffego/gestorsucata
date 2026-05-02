@@ -7,7 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { useStore } from '@/contexts/StoreContext';
-import { Loader2, Store, ArrowUpRight, ArrowDownRight, DollarSign, Wallet, TrendingUp, Calendar, CreditCard } from 'lucide-react';
+import { Loader2, Store, ArrowUpRight, ArrowDownRight, DollarSign, Wallet, TrendingUp, Calendar, CreditCard, FileDown } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 type PeriodoPreset = 'hoje' | '7d' | '30d' | 'mes' | 'ano' | 'custom';
 const FORMAS_PAGAMENTO = ['Todos', 'dinheiro', 'pix', 'cartao_credito', 'cartao_debito', 'fiado'];
@@ -69,6 +71,101 @@ export default function Dashboard() {
     const [girodeEstoqueData, setGirodeEstoqueData] = useState<any[]>([]);
     const [performanceVendedor, setPerformanceVendedor] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+
+    const exportToPDF = () => {
+        const doc = new jsPDF();
+        const periodoLabel: Record<string, string> = {
+            hoje: 'Hoje', '7d': 'Últimos 7 dias', '30d': 'Últimos 30 dias',
+            mes: 'Este mês', ano: 'Este ano', custom: `${customStart} → ${customEnd}`
+        };
+        const lojaLabel = selectedFilter
+            ? allLojas.find(l => l.id === selectedFilter)?.nome || 'Loja'
+            : 'Todas as lojas';
+        const formaLabel: Record<string, string> = {
+            Todos: 'Todos', dinheiro: 'Dinheiro', pix: 'Pix',
+            cartao_credito: 'Crédito', cartao_debito: 'Débito', fiado: 'Fiado'
+        };
+        const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        const now = new Date().toLocaleString('pt-BR');
+
+        // Header
+        doc.setFillColor(18, 18, 18);
+        doc.rect(0, 0, 210, 30, 'F');
+        doc.setTextColor(255, 215, 0);
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.text('GS PRO — Relatório do Painel', 14, 12);
+        doc.setFontSize(8);
+        doc.setTextColor(160, 160, 160);
+        doc.text(`Gerado em: ${now}`, 14, 19);
+        doc.text(`Período: ${periodoLabel[periodo]}  |  Loja: ${lojaLabel}  |  Pagamento: ${formaLabel[formaPagamento]}`, 14, 24);
+
+        // Resumo Financeiro
+        doc.setTextColor(30, 30, 30);
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Resumo Financeiro', 14, 38);
+        autoTable(doc, {
+            startY: 42,
+            head: [['Saldo', 'Entradas', 'Saídas', 'Lucro']],
+            body: [[fmt(resumo.saldo), fmt(resumo.entradas), fmt(resumo.saidas), fmt(resumo.lucro)]],
+            headStyles: { fillColor: [30, 30, 30], textColor: [255, 215, 0], fontStyle: 'bold' },
+            bodyStyles: { textColor: [30, 30, 30] },
+            alternateRowStyles: { fillColor: [245, 245, 245] },
+            styles: { fontSize: 9 },
+        });
+
+        // Vendas Recentes
+        const afterSummary = (doc as any).lastAutoTable.finalY + 8;
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Vendas Recentes', 14, afterSummary);
+        autoTable(doc, {
+            startY: afterSummary + 4,
+            head: [['Loja', 'Vendedor', 'Data/Hora', 'Valor']],
+            body: recentSales.map(s => [s.loja, s.vendedor, s.data, s.cotacao]),
+            headStyles: { fillColor: [30, 30, 30], textColor: [255, 215, 0], fontStyle: 'bold' },
+            bodyStyles: { textColor: [30, 30, 30] },
+            alternateRowStyles: { fillColor: [245, 245, 245] },
+            styles: { fontSize: 9 },
+        });
+
+        // Top Vendedores
+        if (performanceVendedor.length > 0) {
+            const afterRecent = (doc as any).lastAutoTable.finalY + 8;
+            doc.setFontSize(11);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Top Vendedores', 14, afterRecent);
+            autoTable(doc, {
+                startY: afterRecent + 4,
+                head: [['Vendedor', 'Desempenho Relativo (%)']],
+                body: performanceVendedor.map(v => [v.name, `${v.value}%`]),
+                headStyles: { fillColor: [30, 30, 30], textColor: [255, 215, 0], fontStyle: 'bold' },
+                bodyStyles: { textColor: [30, 30, 30] },
+                alternateRowStyles: { fillColor: [245, 245, 245] },
+                styles: { fontSize: 9 },
+            });
+        }
+
+        // Comparativo por loja (superadmin)
+        if (storeFinancials.length > 0) {
+            const afterTop = (doc as any).lastAutoTable.finalY + 8;
+            doc.setFontSize(11);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Comparativo por Loja', 14, afterTop);
+            autoTable(doc, {
+                startY: afterTop + 4,
+                head: [['Loja', 'Entradas', 'Saídas', 'Lucro']],
+                body: storeFinancials.map(sf => [sf.loja_nome, fmt(sf.entradas), fmt(sf.saidas), fmt(sf.lucro)]),
+                headStyles: { fillColor: [30, 30, 30], textColor: [255, 215, 0], fontStyle: 'bold' },
+                bodyStyles: { textColor: [30, 30, 30] },
+                alternateRowStyles: { fillColor: [245, 245, 245] },
+                styles: { fontSize: 9 },
+            });
+        }
+
+        doc.save(`gs-painel-${new Date().toISOString().slice(0,10)}.pdf`);
+    };
 
     const fetchDashboardData = useCallback(async () => {
         setLoading(true);
@@ -348,6 +445,16 @@ export default function Dashboard() {
                         </div>
                     </div>
                 )}
+            {/* Botão Exportar PDF */}
+            <div className="flex justify-end pt-2 border-t border-gray-800">
+                <button
+                    onClick={exportToPDF}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-yellow/10 border border-brand-yellow/30 text-brand-yellow text-xs font-bold uppercase tracking-widest hover:bg-brand-yellow hover:text-brand-dark transition-all duration-200"
+                >
+                    <FileDown className="h-3.5 w-3.5" />
+                    Exportar PDF
+                </button>
+            </div>
             </div>
 
             {/* ===== FINANCIAL SUMMARY CARDS ===== */}
