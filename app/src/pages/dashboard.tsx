@@ -196,9 +196,16 @@ export default function Dashboard() {
                 contasQuery,                                                           // [3]
                 supabase.from('produtos').select('estoque_atual, estoque_minimo'),     // [4]
                 ...(needsStoreBreakdown ? [
-                    supabase.from('vendas').select('valor_total, loja_id'),            // [5]
+                    (() => {
+                        let q = supabase.from('vendas').select('valor_total, loja_id')
+                            .gte('data_venda', dateStart).lte('data_venda', dateEnd);
+                        if (formaPagamento !== 'Todos') q = q.eq('forma_pagamento', formaPagamento);
+                        return q;
+                    })(),                                                              // [5]
                     supabase.from('contas_a_pagar')
-                        .select('valor, loja_id').eq('status', 'pago'),               // [6]
+                        .select('valor, loja_id')
+                        .eq('status', 'pago')
+                        .gte('created_at', dateStart).lte('created_at', dateEnd),    // [6]
                 ] : []),
             ]);
 
