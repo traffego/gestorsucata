@@ -7,7 +7,29 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 import { useStore } from '@/contexts/StoreContext';
-import { Loader2, Store, ArrowUpRight, ArrowDownRight, DollarSign, Wallet, TrendingUp } from 'lucide-react';
+import { Loader2, Store, ArrowUpRight, ArrowDownRight, DollarSign, Wallet, TrendingUp, Calendar, CreditCard } from 'lucide-react';
+
+type PeriodoPreset = 'hoje' | '7d' | '30d' | 'mes' | 'ano' | 'custom';
+const FORMAS_PAGAMENTO = ['Todos', 'dinheiro', 'pix', 'cartao_credito', 'cartao_debito', 'fiado'];
+const FORMA_LABEL: Record<string, string> = {
+    Todos: 'Todos', dinheiro: 'Dinheiro', pix: 'Pix',
+    cartao_credito: 'Crédito', cartao_debito: 'Débito', fiado: 'Fiado'
+};
+function getPeriodoDates(preset: PeriodoPreset, customStart: string, customEnd: string): { start: string; end: string } {
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const toISO = (d: Date) => d.toISOString();
+    const startOfDay = (d: Date) => { d.setHours(0,0,0,0); return d; };
+    const endOfDay   = (d: Date) => { d.setHours(23,59,59,999); return d; };
+    if (preset === 'hoje') return { start: toISO(startOfDay(new Date(now))), end: toISO(endOfDay(new Date(now))) };
+    if (preset === '7d') { const s = new Date(now); s.setDate(s.getDate()-6); return { start: toISO(startOfDay(s)), end: toISO(endOfDay(new Date(now))) }; }
+    if (preset === '30d') { const s = new Date(now); s.setDate(s.getDate()-29); return { start: toISO(startOfDay(s)), end: toISO(endOfDay(new Date(now))) }; }
+    if (preset === 'mes') { const s = new Date(now.getFullYear(), now.getMonth(), 1); return { start: toISO(s), end: toISO(endOfDay(new Date(now))) }; }
+    if (preset === 'ano') { const s = new Date(now.getFullYear(), 0, 1); return { start: toISO(s), end: toISO(endOfDay(new Date(now))) }; }
+    // custom
+    return { start: customStart ? new Date(customStart).toISOString() : toISO(startOfDay(new Date(now))), end: customEnd ? endOfDay(new Date(customEnd)).toISOString() : toISO(endOfDay(new Date(now))) };
+    void pad; // suppress unused
+}
 
 type Loja = { id: string; nome: string; is_matriz: boolean };
 
@@ -25,7 +47,15 @@ export default function Dashboard() {
 
     // Store filter (superadmin only)
     const [allLojas, setAllLojas] = useState<Loja[]>([]);
-    const [selectedFilter, setSelectedFilter] = useState<string | null>(null); // null = todas
+    const [selectedFilter, setSelectedFilter] = useState<string | null>(null);
+
+    // Period filter
+    const [periodo, setPeriodo] = useState<PeriodoPreset>('30d');
+    const [customStart, setCustomStart] = useState('');
+    const [customEnd, setCustomEnd]   = useState('');
+
+    // Payment filter
+    const [formaPagamento, setFormaPagamento] = useState('Todos');
 
     // Financial summary
     const [resumo, setResumo] = useState({ saldo: 0, entradas: 0, saidas: 0, lucro: 0 });
@@ -43,6 +73,7 @@ export default function Dashboard() {
     const fetchDashboardData = useCallback(async () => {
         setLoading(true);
         const filterLojaId = !isSuperAdmin ? (lojaAtual?.id || null) : selectedFilter;
+        const { start: dateStart, end: dateEnd } = getPeriodoDates(periodo, customStart, customEnd);
         try {
 
             // 0. Users map
@@ -50,20 +81,23 @@ export default function Dashboard() {
             const userMap: Record<string, string> = {};
             if (userData) userData.forEach(u => userMap[u.id] = u.nome);
 
-            // === FINANCIAL SUMMARY (vendas + transacoes + contas_a_pagar) ===
-            // Vendas
-            const vendasQuery = supabase.from('vendas').select('valor_total, data_venda, loja_id');
-            if (filterLojaId) vendasQuery.eq('loja_id', filterLojaId);
+            // === FINANCIAL SUMMARY ===
+            let vendasQuery = supabase.from('vendas').select('valor_total, data_venda, loja_id, forma_pagamento')
+                .gte('data_venda', dateStart).lte('data_venda', dateEnd);
+            if (filterLojaId) vendasQuery = vendasQuery.eq('loja_id', filterLojaId);
+            if (formaPagamento !== 'Todos') vendasQuery = vendasQuery.eq('forma_pagamento', formaPagamento);
             const { data: allVendas } = await vendasQuery;
 
             // Transacoes
             const { data: allTransacoes } = await supabase
                 .from('transacoes')
-                .select('valor, tipo, data_transacao, categoria');
+                .select('valor, tipo, data_transacao, categoria')
+                .gte('data_transacao', dateStart).lte('data_transacao', dateEnd);
 
             // Contas a Pagar (pagas)
-            const contasQuery = supabase.from('contas_a_pagar').select('valor, loja_id, categoria').eq('status', 'pago');
-            if (filterLojaId) contasQuery.eq('loja_id', filterLojaId);
+            let contasQuery = supabase.from('contas_a_pagar').select('valor, loja_id, categoria')
+                .eq('status', 'pago').gte('created_at', dateStart).lte('created_at', dateEnd);
+            if (filterLojaId) contasQuery = contasQuery.eq('loja_id', filterLojaId);
             const { data: allContas } = await contasQuery;
 
             let totalEntradas = 0;
@@ -110,12 +144,14 @@ export default function Dashboard() {
             }
 
             // === RECENT SALES ===
-            const recentQuery = supabase
+            let recentQuery = supabase
                 .from('vendas')
                 .select('id, valor_total, data_venda, forma_pagamento, cliente:clientes(nome), usuario_id, loja_id')
                 .order('data_venda', { ascending: false })
+                .gte('data_venda', dateStart).lte('data_venda', dateEnd)
                 .limit(5);
-            if (filterLojaId) recentQuery.eq('loja_id', filterLojaId);
+            if (filterLojaId) recentQuery = recentQuery.eq('loja_id', filterLojaId);
+            if (formaPagamento !== 'Todos') recentQuery = recentQuery.eq('forma_pagamento', formaPagamento);
             const { data: vendas } = await recentQuery;
 
             if (vendas) {
@@ -130,11 +166,11 @@ export default function Dashboard() {
                 }));
             }
 
-            // === SELLER PERFORMANCE (30 days) ===
-            const thirtyDaysAgo = new Date();
-            thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-            const sellerQuery = supabase.from('vendas').select('valor_total, usuario_id').gte('data_venda', thirtyDaysAgo.toISOString());
-            if (filterLojaId) sellerQuery.eq('loja_id', filterLojaId);
+            // === SELLER PERFORMANCE (period) ===
+            let sellerQuery = supabase.from('vendas').select('valor_total, usuario_id')
+                .gte('data_venda', dateStart).lte('data_venda', dateEnd);
+            if (filterLojaId) sellerQuery = sellerQuery.eq('loja_id', filterLojaId);
+            if (formaPagamento !== 'Todos') sellerQuery = sellerQuery.eq('forma_pagamento', formaPagamento);
             const { data: sellerSales } = await sellerQuery;
 
             if (sellerSales) {
@@ -166,10 +202,11 @@ export default function Dashboard() {
                 ]);
             }
 
-            // === MONTHLY CHARTS (current year) ===
-            const currentYearStart = new Date(new Date().getFullYear(), 0, 1).toISOString();
-            const yearSalesQuery = supabase.from('vendas').select('data_venda, valor_total').gte('data_venda', currentYearStart);
-            if (filterLojaId) yearSalesQuery.eq('loja_id', filterLojaId);
+            // === MONTHLY CHARTS ===
+            let yearSalesQuery = supabase.from('vendas').select('data_venda, valor_total')
+                .gte('data_venda', dateStart).lte('data_venda', dateEnd);
+            if (filterLojaId) yearSalesQuery = yearSalesQuery.eq('loja_id', filterLojaId);
+            if (formaPagamento !== 'Todos') yearSalesQuery = yearSalesQuery.eq('forma_pagamento', formaPagamento);
             const { data: yearSales } = await yearSalesQuery;
 
             const { data: yearExpenses } = await supabase
@@ -213,7 +250,7 @@ export default function Dashboard() {
         }
     // allLojas via closure — intencionalmente fora das deps para não causar loop
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [lojaAtual, isSuperAdmin, selectedFilter]);
+    }, [lojaAtual, isSuperAdmin, selectedFilter, periodo, customStart, customEnd, formaPagamento]);
 
     // Fetch lojas for superadmin filter
     useEffect(() => {
@@ -223,13 +260,13 @@ export default function Dashboard() {
         }
     }, [isSuperAdmin]);
 
-    // Fetch data when filter or lojaAtual changes
+    // Fetch data when any filter changes
     useEffect(() => {
         if (loadingStore) return;
         if (isSuperAdmin || lojaAtual) {
             fetchDashboardData();
         }
-    }, [loadingStore, isSuperAdmin, lojaAtual, selectedFilter, fetchDashboardData]);
+    }, [loadingStore, isSuperAdmin, lojaAtual, selectedFilter, periodo, customStart, customEnd, formaPagamento, fetchDashboardData]);
 
 
 
@@ -244,42 +281,104 @@ export default function Dashboard() {
     }
 
     return (
-        <div className="space-y-8">
-            {/* ===== SUPERADMIN: Store Filter ===== */}
-            {isSuperAdmin && allLojas.length > 0 && (
+        <div className="space-y-6">
+
+            {/* ===== FILTER BAR ===== */}
+            <div className="bg-brand-dark border border-gray-800 rounded-2xl p-4 space-y-4">
+
+                {/* Período */}
                 <div className="space-y-2">
-                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Contabilidade por Loja</p>
+                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest flex items-center gap-1.5">
+                        <Calendar className="h-3 w-3" /> Período
+                    </p>
                     <div className="flex flex-wrap gap-2">
-                        <button
-                            onClick={() => setSelectedFilter(null)}
-                            className={cn(
-                                "px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest border transition-all flex items-center gap-2",
-                                selectedFilter === null
-                                    ? "bg-brand-yellow text-brand-dark border-brand-yellow shadow-lg shadow-brand-yellow/10"
-                                    : "bg-brand-dark border-gray-800 text-gray-500 hover:text-white hover:border-gray-600"
-                            )}
-                        >
-                            <TrendingUp className="h-3.5 w-3.5" /> Todas
-                        </button>
-                        {allLojas.map(l => (
-                            <button
-                                key={l.id}
-                                onClick={() => setSelectedFilter(l.id)}
+                        {(['hoje', '7d', '30d', 'mes', 'ano', 'custom'] as PeriodoPreset[]).map(p => (
+                            <button key={p}
+                                onClick={() => setPeriodo(p)}
                                 className={cn(
-                                    "px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest border transition-all flex items-center gap-2",
-                                    selectedFilter === l.id
-                                        ? "bg-brand-red text-white border-brand-red shadow-lg shadow-brand-red/10"
-                                        : "bg-brand-dark border-gray-800 text-gray-500 hover:text-white hover:border-gray-600"
+                                    "px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-widest border transition-all",
+                                    periodo === p
+                                        ? "bg-brand-yellow text-brand-dark border-brand-yellow"
+                                        : "bg-transparent border-gray-800 text-gray-500 hover:text-white hover:border-gray-600"
                                 )}
                             >
-                                <Store className="h-3.5 w-3.5" />
-                                {l.nome}
-                                {l.is_matriz && <span className="text-[8px] opacity-60">⭐</span>}
+                                {{ hoje: 'Hoje', '7d': '7 dias', '30d': '30 dias', mes: 'Este mês', ano: 'Este ano', custom: 'Personalizado' }[p]}
                             </button>
                         ))}
                     </div>
+                    {periodo === 'custom' && (
+                        <div className="flex flex-wrap gap-3 mt-2">
+                            <div className="flex items-center gap-2">
+                                <label className="text-[10px] text-gray-500 uppercase">De</label>
+                                <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)}
+                                    className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-brand-yellow" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <label className="text-[10px] text-gray-500 uppercase">Até</label>
+                                <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)}
+                                    className="bg-gray-900 border border-gray-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-brand-yellow" />
+                            </div>
+                        </div>
+                    )}
                 </div>
-            )}
+
+                {/* Forma de Pagamento */}
+                <div className="space-y-2">
+                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest flex items-center gap-1.5">
+                        <CreditCard className="h-3 w-3" /> Forma de Pagamento
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                        {FORMAS_PAGAMENTO.map(f => (
+                            <button key={f}
+                                onClick={() => setFormaPagamento(f)}
+                                className={cn(
+                                    "px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-widest border transition-all",
+                                    formaPagamento === f
+                                        ? "bg-brand-red text-white border-brand-red"
+                                        : "bg-transparent border-gray-800 text-gray-500 hover:text-white hover:border-gray-600"
+                                )}
+                            >{FORMA_LABEL[f]}</button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Lojas (superadmin) */}
+                {isSuperAdmin && allLojas.length > 0 && (
+                    <div className="space-y-2">
+                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest flex items-center gap-1.5">
+                            <Store className="h-3 w-3" /> Loja
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                            <button
+                                onClick={() => setSelectedFilter(null)}
+                                className={cn(
+                                    "px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-widest border transition-all flex items-center gap-2",
+                                    selectedFilter === null
+                                        ? "bg-brand-yellow text-brand-dark border-brand-yellow"
+                                        : "bg-transparent border-gray-800 text-gray-500 hover:text-white hover:border-gray-600"
+                                )}
+                            >
+                                <TrendingUp className="h-3.5 w-3.5" /> Todas
+                            </button>
+                            {allLojas.map(l => (
+                                <button key={l.id}
+                                    onClick={() => setSelectedFilter(l.id)}
+                                    className={cn(
+                                        "px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-widest border transition-all flex items-center gap-2",
+                                        selectedFilter === l.id
+                                            ? "bg-brand-red text-white border-brand-red"
+                                            : "bg-transparent border-gray-800 text-gray-500 hover:text-white hover:border-gray-600"
+                                    )}
+                                >
+                                    <Store className="h-3 w-3" />
+                                    {l.nome}
+                                    {l.is_matriz && <span className="text-[8px] opacity-60">⭐</span>}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
 
             {/* ===== FINANCIAL SUMMARY CARDS ===== */}
             {isSuperAdmin && (
