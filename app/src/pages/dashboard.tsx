@@ -75,156 +75,126 @@ export default function Dashboard() {
         const filterLojaId = !isSuperAdmin ? (lojaAtual?.id || null) : selectedFilter;
         const { start: dateStart, end: dateEnd } = getPeriodoDates(periodo, customStart, customEnd);
         try {
-
-            // 0. Users map
-            const { data: userData } = await supabase.from('usuarios').select('id, nome');
-            const userMap: Record<string, string> = {};
-            if (userData) userData.forEach(u => userMap[u.id] = u.nome);
-
-            // === FINANCIAL SUMMARY ===
-            let vendasQuery = supabase.from('vendas').select('valor_total, data_venda, loja_id, forma_pagamento')
+            // Build queries upfront
+            let vendasQuery = supabase
+                .from('vendas')
+                .select('id, valor_total, data_venda, loja_id, forma_pagamento, usuario_id, cliente:clientes(nome)')
                 .gte('data_venda', dateStart).lte('data_venda', dateEnd);
             if (filterLojaId) vendasQuery = vendasQuery.eq('loja_id', filterLojaId);
             if (formaPagamento !== 'Todos') vendasQuery = vendasQuery.eq('forma_pagamento', formaPagamento);
-            const { data: allVendas } = await vendasQuery;
 
-            // Transacoes
-            const { data: allTransacoes } = await supabase
-                .from('transacoes')
-                .select('valor, tipo, data_transacao, categoria')
-                .gte('data_transacao', dateStart).lte('data_transacao', dateEnd);
-
-            // Contas a Pagar (pagas)
             let contasQuery = supabase.from('contas_a_pagar').select('valor, loja_id, categoria')
                 .eq('status', 'pago').gte('created_at', dateStart).lte('created_at', dateEnd);
             if (filterLojaId) contasQuery = contasQuery.eq('loja_id', filterLojaId);
-            const { data: allContas } = await contasQuery;
 
+            const needsStoreBreakdown = isSuperAdmin && !filterLojaId && allLojas.length > 0;
+
+            // Dispara TODAS as queries em paralelo (de 7-10 round-trips → 5 ou 7)
+            const results = await Promise.all([
+                supabase.from('usuarios').select('id, nome'),                          // [0]
+                vendasQuery,                                                           // [1]
+                supabase.from('transacoes')
+                    .select('valor, tipo, data_transacao, categoria')
+                    .gte('data_transacao', dateStart).lte('data_transacao', dateEnd), // [2]
+                contasQuery,                                                           // [3]
+                supabase.from('produtos').select('estoque_atual, estoque_minimo'),     // [4]
+                ...(needsStoreBreakdown ? [
+                    supabase.from('vendas').select('valor_total, loja_id'),            // [5]
+                    supabase.from('contas_a_pagar')
+                        .select('valor, loja_id').eq('status', 'pago'),               // [6]
+                ] : []),
+            ]);
+
+            const userData      = results[0].data;
+            const allVendas     = results[1].data as any[];
+            const allTransacoes = results[2].data as any[];
+            const allContas     = results[3].data as any[];
+            const products      = results[4].data;
+
+            // Users map
+            const userMap: Record<string, string> = {};
+            if (userData) (userData as any[]).forEach(u => userMap[u.id] = u.nome);
+
+            // === FINANCIAL SUMMARY ===
             let totalEntradas = 0;
             let totalSaidas = 0;
-
             (allVendas || []).forEach(v => { totalEntradas += Number(v.valor_total || 0); });
             (allTransacoes || []).forEach(t => {
                 if (t.tipo === 'entrada') totalEntradas += Number(t.valor || 0);
                 else if (t.tipo === 'saida') totalSaidas += Number(t.valor || 0);
             });
             (allContas || []).forEach(c => { totalSaidas += Number(c.valor || 0); });
-
-            setResumo({
-                saldo: totalEntradas - totalSaidas,
-                entradas: totalEntradas,
-                saidas: totalSaidas,
-                lucro: totalEntradas - totalSaidas
-            });
+            setResumo({ saldo: totalEntradas - totalSaidas, entradas: totalEntradas, saidas: totalSaidas, lucro: totalEntradas - totalSaidas });
 
             // === PER-STORE BREAKDOWN (superadmin + "Todas") ===
-            if (isSuperAdmin && !filterLojaId && allLojas.length > 0) {
-                const { data: allVendasUnfiltered } = await supabase.from('vendas').select('valor_total, loja_id');
-                const { data: allContasUnfiltered } = await supabase.from('contas_a_pagar').select('valor, loja_id').eq('status', 'pago');
-
+            if (needsStoreBreakdown) {
+                const allVendasUnfiltered = (results[5]?.data || []) as any[];
+                const allContasUnfiltered = (results[6]?.data || []) as any[];
                 const storeMap: Record<string, StoreFinancials> = {};
                 allLojas.forEach(l => {
-                    storeMap[l.id] = {
-                        loja_id: l.id, loja_nome: l.nome, is_matriz: l.is_matriz,
-                        entradas: 0, saidas: 0, lucro: 0
-                    };
+                    storeMap[l.id] = { loja_id: l.id, loja_nome: l.nome, is_matriz: l.is_matriz, entradas: 0, saidas: 0, lucro: 0 };
                 });
-
-                (allVendasUnfiltered || []).forEach(v => {
-                    if (storeMap[v.loja_id]) storeMap[v.loja_id].entradas += Number(v.valor_total || 0);
-                });
-                (allContasUnfiltered || []).forEach(c => {
-                    if (storeMap[c.loja_id]) storeMap[c.loja_id].saidas += Number(c.valor || 0);
-                });
-
+                allVendasUnfiltered.forEach(v => { if (storeMap[v.loja_id]) storeMap[v.loja_id].entradas += Number(v.valor_total || 0); });
+                allContasUnfiltered.forEach(c => { if (storeMap[c.loja_id]) storeMap[c.loja_id].saidas += Number(c.valor || 0); });
                 Object.values(storeMap).forEach(s => { s.lucro = s.entradas - s.saidas; });
                 setStoreFinancials(Object.values(storeMap).sort((a, b) => b.lucro - a.lucro));
             } else {
                 setStoreFinancials([]);
             }
 
-            // === RECENT SALES ===
-            let recentQuery = supabase
-                .from('vendas')
-                .select('id, valor_total, data_venda, forma_pagamento, cliente:clientes(nome), usuario_id, loja_id')
-                .order('data_venda', { ascending: false })
-                .gte('data_venda', dateStart).lte('data_venda', dateEnd)
-                .limit(5);
-            if (filterLojaId) recentQuery = recentQuery.eq('loja_id', filterLojaId);
-            if (formaPagamento !== 'Todos') recentQuery = recentQuery.eq('forma_pagamento', formaPagamento);
-            const { data: vendas } = await recentQuery;
+            // === RECENT SALES (reutiliza allVendas, sem query extra) ===
+            const recentVendas = [...(allVendas || [])]
+                .sort((a, b) => new Date(b.data_venda).getTime() - new Date(a.data_venda).getTime())
+                .slice(0, 5);
+            setRecentSales(recentVendas.map(v => {
+                const loja = allLojas.find(l => l.id === v.loja_id);
+                return {
+                    loja: loja?.nome || lojaAtual?.nome || 'Principal',
+                    vendedor: v.usuario_id ? (userMap[v.usuario_id] || 'Sistema') : 'Sistema',
+                    data: v.data_venda ? new Date(v.data_venda).toLocaleString('pt-BR') : 'Sem data',
+                    cotacao: (v.valor_total || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                };
+            }));
 
-            if (vendas) {
-                setRecentSales(vendas.map((v: any) => {
-                    const loja = allLojas.find(l => l.id === v.loja_id);
-                    return {
-                        loja: loja?.nome || lojaAtual?.nome || 'Principal',
-                        vendedor: v.usuario_id ? (userMap[v.usuario_id] || 'Sistema') : 'Sistema',
-                        data: v.data_venda ? new Date(v.data_venda).toLocaleString('pt-BR') : 'Sem data',
-                        cotacao: (v.valor_total || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-                    };
-                }));
-            }
-
-            // === SELLER PERFORMANCE (period) ===
-            let sellerQuery = supabase.from('vendas').select('valor_total, usuario_id')
-                .gte('data_venda', dateStart).lte('data_venda', dateEnd);
-            if (filterLojaId) sellerQuery = sellerQuery.eq('loja_id', filterLojaId);
-            if (formaPagamento !== 'Todos') sellerQuery = sellerQuery.eq('forma_pagamento', formaPagamento);
-            const { data: sellerSales } = await sellerQuery;
-
-            if (sellerSales) {
-                const salesBySeller: Record<string, { total: number; name: string }> = {};
-                let maxTotal = 0;
-                sellerSales.forEach((s: any) => {
-                    const id = s.usuario_id || 'unknown';
-                    const name = userMap[id] || 'Outros';
-                    if (!salesBySeller[id]) salesBySeller[id] = { total: 0, name };
-                    salesBySeller[id].total += Number(s.valor_total || 0);
-                    if (salesBySeller[id].total > maxTotal) maxTotal = salesBySeller[id].total;
-                });
-                setPerformanceVendedor(
-                    Object.entries(salesBySeller).map(([_, data]) => ({
-                        name: data.name,
-                        value: maxTotal > 0 ? Math.round((data.total / maxTotal) * 100) : 0,
-                        color: Math.random() > 0.5 ? 'bg-brand-red' : 'bg-brand-yellow'
-                    })).sort((a, b) => b.value - a.value).slice(0, 4)
-                );
-            }
+            // === SELLER PERFORMANCE (reutiliza allVendas, sem query extra) ===
+            const salesBySeller: Record<string, { total: number; name: string }> = {};
+            let maxTotal = 0;
+            (allVendas || []).forEach(s => {
+                const id = s.usuario_id || 'unknown';
+                const name = userMap[id] || 'Outros';
+                if (!salesBySeller[id]) salesBySeller[id] = { total: 0, name };
+                salesBySeller[id].total += Number(s.valor_total || 0);
+                if (salesBySeller[id].total > maxTotal) maxTotal = salesBySeller[id].total;
+            });
+            setPerformanceVendedor(
+                Object.entries(salesBySeller).map(([_, data]) => ({
+                    name: data.name,
+                    value: maxTotal > 0 ? Math.round((data.total / maxTotal) * 100) : 0,
+                    color: Math.random() > 0.5 ? 'bg-brand-red' : 'bg-brand-yellow'
+                })).sort((a, b) => b.value - a.value).slice(0, 4)
+            );
 
             // === STOCK ===
-            const { data: products } = await supabase.from('produtos').select('estoque_atual, estoque_minimo');
             if (products) {
-                const emAlerta = products.filter(p => (p.estoque_atual || 0) <= (p.estoque_minimo || 0)).length;
+                const emAlerta = (products as any[]).filter(p => (p.estoque_atual || 0) <= (p.estoque_minimo || 0)).length;
                 setGirodeEstoqueData([
                     { name: 'Em Estoque', value: products.length - emAlerta },
                     { name: 'Reposição', value: emAlerta },
                 ]);
             }
 
-            // === MONTHLY CHARTS ===
-            let yearSalesQuery = supabase.from('vendas').select('data_venda, valor_total')
-                .gte('data_venda', dateStart).lte('data_venda', dateEnd);
-            if (filterLojaId) yearSalesQuery = yearSalesQuery.eq('loja_id', filterLojaId);
-            if (formaPagamento !== 'Todos') yearSalesQuery = yearSalesQuery.eq('forma_pagamento', formaPagamento);
-            const { data: yearSales } = await yearSalesQuery;
-
-            const { data: yearExpenses } = await supabase
-                .from('transacoes')
-                .select('data_transacao, valor, categoria, tipo')
-                .gte('data_transacao', dateStart).lte('data_transacao', dateEnd);
-
+            // === MONTHLY CHARTS (reutiliza allVendas + allTransacoes, sem queries extras) ===
             const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
             const currentMonthIndex = new Date().getMonth();
             const salesByMonth: Record<string, number> = {};
             const expensesByMonth: Record<string, number> = {};
             const expensesByCategory: Record<string, number> = {};
 
-            (yearSales || []).forEach(v => {
+            (allVendas || []).forEach(v => {
                 const month = new Date(v.data_venda).getMonth();
                 salesByMonth[month] = (salesByMonth[month] || 0) + Number(v.valor_total || 0);
             });
-            (yearExpenses || []).forEach(t => {
+            (allTransacoes || []).forEach(t => {
                 const month = new Date(t.data_transacao).getMonth();
                 if (t.tipo === 'saida') {
                     expensesByMonth[month] = (expensesByMonth[month] || 0) + Number(t.valor || 0);
